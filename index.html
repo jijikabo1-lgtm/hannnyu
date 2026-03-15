@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>搬入予約システム</title>
+
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #fff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --brand: #0ea5e9;
+      --brand2: #0284c7;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --shadow: 0 4px 24px rgba(0,0,0,.07);
+      --radius: 14px;
+      --bubble-w: 172px;
+      --bubble-h: 60px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,'Segoe UI','Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+    /* ── Header ── */
+    .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:0 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 16px rgba(0,0,0,.25);position:sticky;top:0;z-index:200}
+    .hdr-logo{font-size:17px;font-weight:800;padding:14px 0;white-space:nowrap}
+    .hdr-pdf{display:flex;align-items:center;gap:8px;padding:8px 0}
+    .hdr-pdf label{font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap}
+    .hdr-pdf input{font-size:12px;color:rgba(255,255,255,.9)}
+    .page-nav{display:flex;align-items:center;gap:6px}
+    .page-nav button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px;transition:background .15s}
+    .page-nav button:hover{background:rgba(255,255,255,.28)}
+    .page-nav button:disabled{opacity:.35;cursor:not-allowed}
+    .page-lbl{font-size:13px;color:rgba(255,255,255,.8);white-space:nowrap;min-width:90px;text-align:center}
+    .conn{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.65);margin-left:auto;padding:8px 0}
+    .conn-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0}
+    .conn-dot.on{background:#4ade80}
+    .conn-dot.off{background:#f87171}
+
+    /* ── Tabs ── */
+    .tabs{background:var(--card);border-bottom:2px solid var(--border);display:flex;gap:2px;padding:0 18px}
+    .tab-btn{padding:11px 20px;border:none;background:none;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0;transition:all .15s}
+    .tab-btn:hover{color:var(--brand);background:#f0f9ff}
+    .tab-btn.active{color:var(--brand);border-bottom-color:var(--brand)}
+    .tab-pane{display:none}
+    .tab-pane.active{display:block}
+
+    /* ── Layout ── */
+    .wrap{max-width:1800px;margin:0 auto;padding:16px 18px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .card-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .card-hdr h2{font-size:15px;font-weight:700}
+    .card-body{padding:16px}
+
+    /* ── Buttons ── */
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .btn:hover{border-color:#94a3b8;background:#f8fafc}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    .btn-primary:hover{background:var(--brand2);border-color:var(--brand2)}
+    .btn-ok{background:var(--ok);border-color:var(--ok);color:#fff}
+    .btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+    .btn-warn{background:var(--warn);border-color:var(--warn);color:#fff}
+
+    /* ── Form ── */
+    .field{display:flex;flex-direction:column;gap:5px}
+    .field label{font-size:12px;font-weight:600;color:var(--muted)}
+    .field input,.field select,.field textarea{border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;background:#fff;transition:border-color .15s;width:100%}
+    .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
+    .field textarea{min-height:66px;resize:vertical}
+    .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .fgrid .full{grid-column:1/-1}
+    .req{color:var(--danger)}
+
+    /* ── Stage ── */
+    .stage-wrap{position:relative;background:#fff;border-radius:10px;border:1px dashed #cbd5e1;overflow:hidden;aspect-ratio:16/9}
+    canvas#bg{position:absolute;top:0;left:0;display:block}
+    svg#overlay{position:absolute;top:0;left:0;touch-action:none}
+    .fs-btn{position:absolute;top:10px;right:10px;z-index:10;background:rgba(15,23,42,.72);color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:600;backdrop-filter:blur(4px)}
+    .stage-wrap.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;border-radius:0;border:none;aspect-ratio:unset}
+    .stage-wrap.fullscreen.rot90 {transform:rotate(90deg);width:100vh;height:100vw;top:calc((100vh - 100vw)/2);left:calc((100vw - 100vh)/2)}
+    .stage-wrap.fullscreen.rot180{transform:rotate(180deg)}
+    .stage-wrap.fullscreen.rot270{transform:rotate(270deg);width:100vh;height:100vw;top:calc((100vh - 100vw)/2);left:calc((100vw - 100vh)/2)}
+    .stage-hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.72);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;pointer-events:none;white-space:nowrap}
+
+    /* ── Map list ── */
+    .mitem{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+    .mitem:last-child{border-bottom:none}
+    .mitem:hover{background:#f8fafc}
+    .mitem.selected{background:#eff6ff}
+
+    /* ── Status badges ── */
+    .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+    .badge-予約中{background:#dbeafe;color:#1d4ed8}
+    .badge-完了{background:#dcfce7;color:#15803d}
+    .badge-キャンセル{background:#fee2e2;color:#b91c1c}
+
+    /* ── Table ── */
+    .rtable{width:100%;border-collapse:collapse;font-size:13px}
+    .rtable th{padding:10px 12px;text-align:left;font-weight:700;background:#f8fafc;border-bottom:2px solid var(--border);white-space:nowrap;color:var(--muted);font-size:12px}
+    .rtable td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .rtable tr:hover td{background:#f8fafc}
+    .rtable tr:last-child td{border-bottom:none}
+
+    /* ── Modal ── */
+    .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:5000;justify-content:center;align-items:center;padding:16px}
+    .modal-bg.open{display:flex}
+    .modal{background:var(--card);border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,0,0,.28);width:100%;max-width:660px;max-height:92vh;overflow-y:auto}
+    .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .modal-hdr h3{font-size:16px;font-weight:700}
+    .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:6px;line-height:1}
+    .modal-close:hover{background:#f1f5f9}
+    .modal-body{padding:20px}
+    .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+    /* ── Stats ── */
+    .stat-box{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px 16px;text-align:center;min-width:90px}
+    .stat-num{font-size:24px;font-weight:800}
+    .stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
+
+    /* ── Config warning ── */
+    .cfg-warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;font-size:13px;color:#c2410c;margin-bottom:14px;display:none}
+
+    /* ── Toast ── */
+    .toast{position:fixed;bottom:20px;right:20px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:12px;box-shadow:var(--shadow);font-size:14px;display:none;max-width:360px;z-index:9999;line-height:1.5}
+
+    /* ── Spinner ── */
+    .spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ── Fullscreen FS panel ── */
+    #fsPanel{display:none;position:fixed;z-index:2000;background:rgba(17,24,39,.88);backdrop-filter:blur(12px);border-radius:20px;padding:10px 18px;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:96vw;cursor:grab;user-select:none;touch-action:none}
+    #fsPanel.show{display:flex}
+    #fsPanel label{font-size:11px;color:#94a3b8;margin-bottom:2px;display:block}
+    #fsPanel select{background:#1e293b;color:#f1f5f9;border:1px solid #334155;border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600}
+    #fsPanel .sep{width:1px;height:38px;background:#334155;flex-shrink:0}
+    #fsPanel .fsfield{display:flex;flex-direction:column;gap:2px}
+    .fscount{font-size:12px;color:#64748b;white-space:nowrap}
+
+    /* Print */
+    @media print{.hdr,.tabs,.card-hdr .btn,.btn,.stage-wrap,.cfg-warn,.toast{display:none!important}.rtable{font-size:11px}.badge{border:1px solid #ccc}}
+
+    /* Mobile */
+    @media(max-width:640px){.fgrid{grid-template-columns:1fr}.wrap{padding:10px 12px}.tabs{padding:0 12px}.hdr{padding:0 12px}.card-body{padding:12px}}
+  </style>
+</head>
+<body>
+
+<!-- ════ HEADER ════ -->
+<header class="hdr">
+  <div class="hdr-logo">🏗 搬入予約システム</div>
+  <div class="hdr-pdf">
+    <label>図面PDF</label>
+    <input id="pdfInput" type="file" accept="application/pdf" />
+  </div>
+  <div class="page-nav">
+    <button id="btnPrev" disabled>◀</button>
+    <span class="page-lbl" id="pageInfo">PDF未選択</span>
+    <button id="btnNext" disabled>▶</button>
+  </div>
+  <div class="conn" id="connWrap">
+    <div class="conn-dot" id="connDot"></div>
+    <span id="connLbl">接続確認中…</span>
+  </div>
+</header>
+
+<!-- ════ TABS ════ -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="map">📐 図面・予約</button>
+  <button class="tab-btn" data-tab="list">📋 予約一覧</button>
+</div>
+
+<!-- ════ MAIN ════ -->
+<div class="wrap">
+  <div class="cfg-warn" id="cfgWarn">
+    ⚠️ <strong>Firebase 未設定</strong> — <code>index.html</code> の <strong>FIREBASE CONFIG</strong> に設定を入力してください。現在はこのブラウザのみで動作しています（他ユーザーと共有されません）。
+  </div>
+
+  <!-- ── MAP TAB ── -->
+  <div class="tab-pane active" id="tab-map">
+    <div class="card">
+      <!-- controls bar -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div class="field" style="flex:1;min-width:150px">
+          <label>業者フィルター</label>
+          <select id="fltVendorMap" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px">
+            <option value="">全業者表示</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:150px">
+          <label>日付フィルター</label>
+          <input type="date" id="fltDateMap" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" />
+        </div>
+        <div style="display:flex;gap:6px;align-self:flex-end">
+          <button class="btn" id="btnRotL" title="左90°" style="padding:8px 12px;font-size:18px">↺</button>
+          <button class="btn" id="btnRotR" title="右90°" style="padding:8px 12px;font-size:18px">↻</button>
+        </div>
+        <span style="font-size:12px;color:var(--muted);align-self:flex-end;white-space:nowrap">図面をクリック → 予約追加</span>
+      </div>
+
+      <!-- stage -->
+      <div style="padding:12px 16px">
+        <div class="stage-wrap" id="stageWrap">
+          <canvas id="bg"></canvas>
+          <svg id="overlay"></svg>
+          <button class="fs-btn" id="btnFs">⛶ 全画面</button>
+          <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
+        </div>
+      </div>
+
+      <!-- page reservation list -->
+      <div style="padding:0 16px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <strong style="font-size:14px">このページの予約</strong>
+          <span id="mapCnt" style="font-size:12px;color:var(--muted)">0件</span>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:10px;max-height:260px;overflow-y:auto" id="mapList">
+          <div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">
+            図面をクリックして予約を追加してください
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LIST TAB ── -->
+  <div class="tab-pane" id="tab-list">
+    <div class="card">
+      <div class="card-hdr">
+        <h2>📋 予約一覧</h2>
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="btnCsv">📤 CSV出力</button>
+          <button class="btn" id="btnPrint">🖨 印刷</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- filters -->
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+          <div class="field"><label>業者名</label><select id="fltVendorList" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option></select></div>
+          <div class="field"><label>ステータス</label><select id="fltStatus" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option><option>予約中</option><option>完了</option><option>キャンセル</option></select></div>
+          <div class="field"><label>日付（から）</label><input type="date" id="fltFrom" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" /></div>
+          <div class="field"><label>日付（まで）</label><input type="date" id="fltTo" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" /></div>
+          <div class="field"><label>フロア/ページ</label><select id="fltPage" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option></select></div>
+          <button class="btn" id="btnClearFlt" style="align-self:flex-end">クリア</button>
+        </div>
+        <!-- stats -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+          <div class="stat-box"><div class="stat-num" id="sTotal" style="color:var(--brand)">0</div><div class="stat-lbl">合計</div></div>
+          <div class="stat-box"><div class="stat-num" id="sActive" style="color:#1d4ed8">0</div><div class="stat-lbl">予約中</div></div>
+          <div class="stat-box"><div class="stat-num" id="sDone" style="color:#15803d">0</div><div class="stat-lbl">完了</div></div>
+          <div class="stat-box"><div class="stat-num" id="sCancel" style="color:#b91c1c">0</div><div class="stat-lbl">キャンセル</div></div>
+        </div>
+        <!-- table -->
+        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px">
+          <table class="rtable">
+            <thead><tr>
+              <th>No.</th><th>搬入日</th><th>時間</th><th>業者名</th><th>担当者</th>
+              <th>場所・フロア</th><th>品目</th><th>車両</th><th>ステータス</th><th>操作</th>
+            </tr></thead>
+            <tbody id="resTbody"><tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">読み込み中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- ════ TOAST ════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ════ RESERVATION FORM MODAL ════ -->
+<div class="modal-bg" id="formModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="formTitle">📦 搬入予約を追加</h3>
+      <button class="modal-close" id="formClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="fId" />
+      <input type="hidden" id="fPage" />
+      <input type="hidden" id="fMx" /><input type="hidden" id="fMy" />
+      <input type="hidden" id="fBdx" /><input type="hidden" id="fBdy" />
+      <div class="fgrid">
+        <div class="field full"><label>業者名 <span class="req">*</span></label><input type="text" id="fVendor" placeholder="例：山田建設" /></div>
+        <div class="field"><label>担当者名</label><input type="text" id="fContact" placeholder="例：山田 太郎" /></div>
+        <div class="field"><label>連絡先電話番号</label><input type="tel" id="fPhone" placeholder="例：090-0000-0000" /></div>
+        <div class="field"><label>搬入日 <span class="req">*</span></label><input type="date" id="fDate" /></div>
+        <div class="field"><label>開始時刻</label><input type="time" id="fTs" /></div>
+        <div class="field"><label>終了時刻（予定）</label><input type="time" id="fTe" /></div>
+        <div class="field"><label>フロア / 搬入場所</label><input type="text" id="fFloor" placeholder="例：1F 玄関ホール" /></div>
+        <div class="field"><label>車両種別</label>
+          <select id="fVehicle"><option value="">選択なし</option><option>軽トラック</option><option>2トン車</option><option>4トン車</option><option>10トン車</option><option>クレーン車</option><option>その他</option></select>
+        </div>
+        <div class="field full"><label>搬入品目 <span class="req">*</span></label><textarea id="fItems" placeholder="例：キッチンセット一式、食器棚×2、冷蔵庫×1"></textarea></div>
+        <div class="field full"><label>備考・注意事項</label><textarea id="fNotes" placeholder="例：搬入口は北側のみ使用可、養生シート持参"></textarea></div>
+        <div class="field" id="statusField" style="display:none"><label>ステータス</label>
+          <select id="fStatus"><option>予約中</option><option>完了</option><option>キャンセル</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="formCancel">キャンセル</button>
+      <button class="btn btn-primary" id="formSave"><span>💾 保存</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ DETAIL MODAL ════ -->
+<div class="modal-bg" id="detailModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr">
+      <h3>📋 予約詳細</h3>
+      <button class="modal-close" id="detailClose">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer">
+      <button class="btn" id="detailClose2">閉じる</button>
+      <button class="btn btn-warn" id="detailEdit">✏️ 編集</button>
+      <button class="btn btn-danger" id="detailDel">🗑 削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ FULLSCREEN PANEL ════ -->
+<div id="fsPanel">
+  <div style="width:36px;height:4px;background:#475569;border-radius:4px;margin:0 auto 6px;cursor:grab;flex-basis:100%"></div>
+  <div class="fsfield">
+    <label>ページ</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn" id="fsBtnPrev" style="padding:6px 10px;background:#1e293b;color:#f1f5f9;border-color:#334155">◀</button>
+      <span class="fscount" id="fsPageInfo">-</span>
+      <button class="btn" id="fsBtnNext" style="padding:6px 10px;background:#1e293b;color:#f1f5f9;border-color:#334155">▶</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="fsfield">
+    <label>回転</label>
+    <div style="display:flex;gap:6px">
+      <button class="btn" id="fsBtnRotL" style="padding:6px 12px;background:#1e293b;color:#f1f5f9;border-color:#334155;font-size:18px">↺</button>
+      <button class="btn" id="fsBtnRotR" style="padding:6px 12px;background:#1e293b;color:#f1f5f9;border-color:#334155;font-size:18px">↻</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <span class="fscount" id="fsCnt">0件</span>
+  <div class="sep"></div>
+  <button class="btn" id="btnExitFs" style="background:#dc2626;color:#fff;border-color:#dc2626;padding:7px 14px">✕ 閉じる</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  ★★★  FIREBASE CONFIG  ★★★
+//  https://console.firebase.google.com でプロジェクト作成後
+//  「アプリを追加 > ウェブ」から取得した設定値をここに貼り付けてください
+// ══════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyAmuiGdhWPUQyyY_GDUWqujoEVqy7Dhi0c",
+  authDomain:        "hannnyu.firebaseapp.com",
+  projectId:         "hannnyu",
+  storageBucket:     "hannnyu.firebasestorage.app",
+  messagingSenderId: "737350047078",
+  appId:             "1:737350047078:web:22a0807257217393ab64a7"
+};
+// ══════════════════════════════════════════════════
+
+// ── PDF.js worker ── (必須: これがないと大きいPDFでブラウザが固まる)
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// ── Utilities ──
+const $ = id => document.getElementById(id);
+const esc = s => String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const svgNS = "http://www.w3.org/2000/svg";
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+function toast(msg, dur=4000){
+  const t=$("toast"); t.textContent=msg; t.style.display="block";
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none"},dur);
+}
+
+// ── Firebase / localStorage fallback ──
+let db=null, dbUnsub=null, usingFb=false;
+const IS_CFG = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+
+if(IS_CFG){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    usingFb = true;
+    setConn(true);
+  }catch(e){ console.error("Firebase init:",e); showCfgWarn(); }
+}else{ showCfgWarn(); }
+
+function setConn(on){
+  $("connDot").className = "conn-dot " + (on?"on":"off");
+  $("connLbl").textContent = on ? "リアルタイム同期中" : "ローカルモード";
+}
+function showCfgWarn(){ $("cfgWarn").style.display="block"; setConn(false); }
+
+const LS_KEY = "delivery_resv_v1";
+function lsLoad(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; } }
+function lsSave(a){ localStorage.setItem(LS_KEY,JSON.stringify(a)); }
+
+// ── State ──
+let reservations = [];
+let selId = null;
+
+// PDF state
+let pdfDoc = null, curPage = 1, pageCount = 0, normalRot = 0;
+let isFs = false, fsRot = 0;
+let pdfLoadSeq = 0; // ページ競合防止用シーケンス番号
+
+// Stage geometry
+let stageW=1, stageH=1;
+let imgRect = { iw:1, ih:1, sc:1, rot:0 };  // normalized coordinate system
+
+// Bubble size
+const BW = 172, BH = 60;
+
+// Drag state
+let drag=null, pendingDrag=null;
+const DRAG_THR = 6;
+
+// ── Stage elements ──
+const bgCanvas=$("bg"), ctx=bgCanvas.getContext("2d");
+const overlay=$("overlay"), stageWrap=$("stageWrap");
+
+// ── Stage resize ──
+function resizeStage(){
+  const dpr = window.devicePixelRatio||1;
+  let cssW, cssH;
+  if(isFs && (fsRot===90||fsRot===270)){
+    cssW=window.innerHeight; cssH=window.innerWidth;
+  } else if(isFs){
+    cssW=window.innerWidth; cssH=window.innerHeight;
+  } else {
+    const r=stageWrap.getBoundingClientRect();
+    cssW=Math.max(1,Math.round(r.width)); cssH=Math.max(1,Math.round(r.height));
+  }
+  stageW=cssW; stageH=cssH;
+  bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
+  bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
+  overlay.style.width=cssW+"px"; overlay.style.height=cssH+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  overlay.setAttribute("viewBox",`0 0 ${stageW} ${stageH}`);
+  redrawBg(); redrawOverlay();
+}
+window.addEventListener("resize",resizeStage);
+
+// ── Background drawing ──
+function drawGrid(){
+  ctx.clearRect(0,0,stageW,stageH);
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,stageW,stageH);
+  ctx.strokeStyle="#e8edf2"; ctx.lineWidth=1;
+  for(let x=0;x<stageW;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,stageH);ctx.stroke(); }
+  for(let y=0;y<stageH;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(stageW,y);ctx.stroke(); }
+  ctx.fillStyle="#94a3b8"; ctx.font="14px system-ui,sans-serif"; ctx.textAlign="center";
+  ctx.fillText("PDFをアップロードしてください",stageW/2,stageH/2);
+  imgRect={iw:stageW,ih:stageH,sc:1,rot:0};
+}
+
+function drawImageFit(img){
+  const rot = isFs ? 0 : normalRot;
+  const iw=img.width, ih=img.height, cw=stageW, ch=stageH;
+  const swapped = (rot===90||rot===270);
+  const sc = Math.min(cw/(swapped?ih:iw), ch/(swapped?iw:ih));
+  imgRect = { iw, ih, sc, rot };
+  ctx.clearRect(0,0,cw,ch);
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch);
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+  if(rot===0){
+    const dw=iw*sc, dh=ih*sc;
+    ctx.drawImage(img,0,0,iw,ih,(cw-dw)/2,(ch-dh)/2,dw,dh);
+  } else {
+    ctx.save(); ctx.translate(cw/2,ch/2); ctx.rotate(rot*Math.PI/180);
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
+    ctx.drawImage(img,0,0,iw,ih,-iw*sc/2,-ih*sc/2,iw*sc,ih*sc);
+    ctx.restore();
+  }
+}
+
+// ── Coordinate conversion (same as original system) ──
+function canvasPxToImgRatio(px,py){
+  const {iw,ih,sc,rot}=imgRect;
+  const cx=px-stageW/2, cy=py-stageH/2;
+  const rad=-rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+  const lx=(cx*cos-cy*sin)/sc, ly=(cx*sin+cy*cos)/sc;
+  return { x:lx/iw+0.5, y:ly/ih+0.5 };
+}
+function imgRatioToCanvasPx(rx,ry){
+  // imgRect.rot is already 0 in FS (drawImageFit stores rot=0 when isFs=true)
+  // so we always use rot from imgRect directly — no conditional needed
+  const {iw,ih,sc,rot}=imgRect;
+  const lx=(rx-0.5)*iw, ly=(ry-0.5)*ih;
+  const rad=rot*Math.PI/180;
+  const cos=Math.cos(rad), sin=Math.sin(rad);
+  return { x:(lx*cos-ly*sin)*sc+stageW/2, y:(lx*sin+ly*cos)*sc+stageH/2 };
+}
+// FS coord from pointer event (matches original)
+function svgPtFromEvent(e){
+  const rot = isFs ? fsRot : 0;
+  if(rot===0){
+    const r=overlay.getBoundingClientRect();
+    return { x:(e.clientX-r.left)*(stageW/r.width), y:(e.clientY-r.top)*(stageH/r.height) };
+  }
+  const cx=window.innerWidth/2, cy=window.innerHeight/2;
+  let dx=e.clientX-cx, dy=e.clientY-cy;
+  const rad=-rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+  return { x:dx*cos-dy*sin+stageW/2, y:dx*sin+dy*cos+stageH/2 };
+}
+
+function redrawBg(){
+  if(!pdfDoc||!pdfDoc._curImg){ drawGrid(); return; }
+  drawImageFit(pdfDoc._curImg);
+}
+
+// ── PDF loading ──
+$("pdfInput").addEventListener("change", async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    toast("PDFページ画像を生成しています…（図面が大きい場合、数秒かかります）");
+    const ab=await file.arrayBuffer();
+    pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
+    pageCount=pdfDoc.numPages; curPage=1;
+    await loadPdfPage(curPage);
+    updatePageInfo();
+    toast(`PDF読み込み完了（${pageCount}ページ）。図面をクリックして予約を追加できます。`);
+    $("stageHint").style.display="none";
+  }catch(err){ toast("PDF読み込みエラー: "+err.message); }
+});
+
+async function loadPdfPage(n){
+  if(!pdfDoc) return;
+  // シーケンス番号で競合防止：連打時に古いページが上書きするのを防ぐ
+  const mySeq = ++pdfLoadSeq;
+
+  const page=await pdfDoc.getPage(n);
+  if(mySeq !== pdfLoadSeq) return; // より新しいリクエストが来ていたら中断
+
+  // 200 DPI rendering — matches original system quality
+  // PDF 1pt = 1/72 inch, so scale = targetDPI / 72
+  const vp1 = page.getViewport({scale:1, rotation:0});
+  const TARGET_DPI = 200;
+  const dpiScale   = TARGET_DPI / 72;
+  const baseMax    = Math.max(vp1.width, vp1.height);
+  const MAX_LONG   = 10000; // cap long edge at 10000px
+  const scale      = clamp(dpiScale, 0.5, MAX_LONG / baseMax);
+  const vp = page.getViewport({scale, rotation:0});
+
+  const tmp=document.createElement("canvas");
+  tmp.width  = Math.max(1, Math.floor(vp.width));
+  tmp.height = Math.max(1, Math.floor(vp.height));
+  const tmpCtx = tmp.getContext("2d", {alpha:false});
+  tmpCtx.fillStyle="#ffffff";
+  tmpCtx.fillRect(0,0,tmp.width,tmp.height);
+
+  // intent:"print" renders at higher quality (no antialiasing shortcuts)
+  await page.render({canvasContext:tmpCtx, viewport:vp, intent:"print"}).promise;
+  if(mySeq !== pdfLoadSeq) return; // レンダリング中に別ページが要求されていたら破棄
+
+  const img=new Image(); img.src=tmp.toDataURL("image/png");
+  await new Promise(res=>{ img.onload=res; });
+  if(mySeq !== pdfLoadSeq) return; // 画像変換中も確認
+
+  pdfDoc._curImg=img;
+  resizeStage();
+}
+
+function updatePageInfo(){
+  if(!pdfDoc){ $("pageInfo").textContent="PDF未選択"; $("btnPrev").disabled=true; $("btnNext").disabled=true; return; }
+  $("pageInfo").textContent=`${curPage} / ${pageCount} ページ`;
+  $("btnPrev").disabled=curPage<=1; $("btnNext").disabled=curPage>=pageCount;
+  $("fsPageInfo").textContent=`${curPage}/${pageCount}`;
+  $("fsCnt").textContent=`${getPageRes().length}件`;
+}
+
+$("btnPrev").addEventListener("click",async()=>{
+  if(curPage>1){ curPage--; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); }
+});
+$("btnNext").addEventListener("click",async()=>{
+  if(curPage<pageCount){ curPage++; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); }
+});
+$("fsBtnPrev").addEventListener("click",async()=>{ if(curPage>1){ curPage--; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); } });
+$("fsBtnNext").addEventListener("click",async()=>{ if(curPage<pageCount){ curPage++; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); } });
+
+// ── Rotation ──
+$("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; resizeStage(); });
+$("btnRotR").addEventListener("click",()=>{ normalRot=(normalRot+90)%360; resizeStage(); });
+$("fsBtnRotL").addEventListener("click",()=>{ fsRot=(fsRot-90+360)%360; applyFsRotClass(); resizeStage(); });
+$("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; applyFsRotClass(); resizeStage(); });
+function applyFsRotClass(){
+  stageWrap.classList.remove("rot90","rot180","rot270");
+  if(fsRot===90) stageWrap.classList.add("rot90");
+  if(fsRot===180) stageWrap.classList.add("rot180");
+  if(fsRot===270) stageWrap.classList.add("rot270");
+}
+
+// ── Fullscreen ──
+let panelPos=null, panelDrag=null;
+$("btnFs").addEventListener("click",enterFs);
+$("btnExitFs").addEventListener("click",exitFs);
+window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&isFs){ exitFs(); e.preventDefault(); } });
+function enterFs(){
+  stageWrap.classList.add("fullscreen"); $("btnFs").textContent="✕ 閉じる";
+  isFs=true; fsRot=0; applyFsRotClass();
+  $("fsPanel").classList.add("show"); panelPos=null;
+  resizeStage();
+  setTimeout(()=>setPanelDefault(),100);
+}
+function exitFs(){
+  stageWrap.classList.remove("fullscreen","rot90","rot180","rot270");
+  $("btnFs").textContent="⛶ 全画面"; isFs=false; fsRot=0;
+  $("fsPanel").classList.remove("show"); stageWrap.style.aspectRatio="16/9";
+  resizeStage();
+}
+function setPanelDefault(){
+  const p=$("fsPanel"); const pw=p.offsetWidth||600, ph=p.offsetHeight||80;
+  const vw=window.innerWidth, vh=window.innerHeight;
+  panelPos={x:Math.round((vw-pw)/2), y:vh-ph-24}; applyPanelPos();
+}
+function applyPanelPos(){
+  if(!panelPos) return;
+  const p=$("fsPanel"), pw=p.offsetWidth, ph=p.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
+  p.style.left=clamp(panelPos.x,0,vw-pw)+"px"; p.style.top=clamp(panelPos.y,0,vh-ph)+"px";
+  p.style.bottom="auto"; p.style.transform="none";
+}
+$("fsPanel").addEventListener("pointerdown",e=>{
+  if(e.target.tagName==="SELECT"||e.target.tagName==="BUTTON") return;
+  if(!isFs) return; e.stopPropagation();
+  const r=$("fsPanel").getBoundingClientRect();
+  panelDrag={sx:e.clientX,sy:e.clientY,px:panelPos?panelPos.x:r.left,py:panelPos?panelPos.y:r.top};
+  if(!panelPos) panelPos={x:r.left,y:r.top};
+  $("fsPanel").setPointerCapture(e.pointerId); e.preventDefault();
+});
+$("fsPanel").addEventListener("pointermove",e=>{
+  if(!panelDrag) return;
+  panelPos={x:panelDrag.px+(e.clientX-panelDrag.sx), y:panelDrag.py+(e.clientY-panelDrag.sy)};
+  applyPanelPos(); e.preventDefault();
+});
+$("fsPanel").addEventListener("pointerup",e=>{ 
+  if(panelDrag){ try{ $("fsPanel").releasePointerCapture(e.pointerId); }catch(_){} }
+  panelDrag=null; e.preventDefault(); 
+});
+window.addEventListener("resize",()=>{ if(isFs){ panelPos=null; setTimeout(setPanelDefault,50); } });
+
+// ── Vendor color map ──
+const VENDOR_COLORS = {
+  "大工":"#dc2626","電気":"#2563eb","設備":"#16a34a","内装":"#7c3aed",
+  "クリーニング":"#0891b2","左官":"#d97706","塗装":"#db2777",
+  "鉄骨":"#475569","その他":"#6b7280"
+};
+function vColor(name){
+  if(VENDOR_COLORS[name]) return VENDOR_COLORS[name];
+  let h=0; for(const c of String(name)) h=((h<<5)-h)+c.charCodeAt(0);
+  const hues=[0,30,60,120,180,210,240,270,300,330];
+  return `hsl(${hues[Math.abs(h)%hues.length]},70%,45%)`;
+}
+
+// ── SVG helper ──
+function mk(tag,attrs={}){
+  const el=document.createElementNS(svgNS,tag);
+  for(const [k,v] of Object.entries(attrs)) el.setAttribute(k,String(v));
+  return el;
+}
+
+// ── Filter current page reservations ──
+function getPageRes(){
+  const vf=$("fltVendorMap").value, df=$("fltDateMap").value;
+  return reservations.filter(r=>{
+    if(r.pdfPage!==curPage) return false;
+    if(vf && r.vendorName!==vf) return false;
+    if(df && r.deliveryDate!==df) return false;
+    return true;
+  });
+}
+
+// ── Overlay rendering ──
+function redrawOverlay(){
+  while(overlay.firstChild) overlay.removeChild(overlay.firstChild);
+  const hit=mk("rect",{x:0,y:0,width:stageW,height:stageH,fill:"transparent","pointer-events":"all"});
+  overlay.appendChild(hit);
+
+  const arr=getPageRes();
+  // Default offset in same units as original: canvas px / (imgDim * scale)
+  const DEF_DX = 24  / (imgRect.iw * imgRect.sc);
+  const DEF_DY = -52 / (imgRect.ih * imgRect.sc);
+
+  arr.forEach((res,idx)=>{
+    if(res.markerX==null||res.markerY==null) return;
+    const isSel=res.id===selId;
+    const color=vColor(res.vendorName||"その他");
+    const g=mk("g",{"data-id":res.id});
+
+    // Anchor canvas position
+    const a=imgRatioToCanvasPx(res.markerX, res.markerY);
+    const ax=a.x, ay=a.y;
+
+    // Bubble TOP-LEFT: use imgRatioToCanvasPx(anchor + offset) — exactly like the original.
+    // This correctly handles rotation because imgRatioToCanvasPx uses imgRect.rot.
+    const bdx = res.bubbleDx ?? DEF_DX;
+    const bdy = res.bubbleDy ?? DEF_DY;
+    const _b = imgRatioToCanvasPx(res.markerX + bdx, res.markerY + bdy);
+    const bx=_b.x, by=_b.y;          // bubble top-left
+    const bcx=bx+BW/2, bcy=by+BH/2;  // bubble center (for line endpoint)
+
+    // FS mode: CSS rotates stageWrap, so SVG bubble must counter-rotate
+    const rot=isFs?fsRot:0;
+
+    // Line anchor→bubble center
+    const line=mk("line",{x1:ax,y1:ay,x2:bcx,y2:bcy,stroke:color,"stroke-width":1.8,"stroke-opacity":0.75,"stroke-dasharray":"4 2"});
+    g.appendChild(line);
+
+    // Anchor circle (draggable)
+    const anc=mk("circle",{cx:ax,cy:ay,r:9,fill:color,stroke:isSel?"#0ea5e9":"white","stroke-width":isSel?3:2,cursor:"pointer"});
+    anc.setAttribute("data-role","anchor"); g.appendChild(anc);
+
+    // Anchor number label
+    const an=mk("text",{x:ax,y:ay+4.5,"text-anchor":"middle","font-size":"10","font-weight":"800",fill:"white","pointer-events":"none"});
+    an.textContent=idx+1; g.appendChild(an);
+
+    // Bubble group (draggable, counter-rotated in FS)
+    const bcxRel=BW/2, bcyRel=BH/2;
+    const bubTr = rot===0 ? `translate(${bx},${by})` : `translate(${bx},${by}) rotate(${-rot},${bcxRel},${bcyRel})`;
+    const bg2=mk("g",{transform:bubTr,cursor:"pointer"});
+    bg2.setAttribute("data-role","bubble");
+
+    // shadow
+    bg2.appendChild(mk("rect",{x:2,y:2,width:BW,height:BH,rx:11,fill:"rgba(0,0,0,0.07)"}));
+    // bg
+    bg2.appendChild(mk("rect",{x:0,y:0,width:BW,height:BH,rx:11,fill:"white",stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
+    // color accent
+    bg2.appendChild(mk("rect",{x:0,y:0,width:5,height:BH,rx:3,fill:color}));
+
+    // vendor name
+    const t1=mk("text",{x:12,y:19,"font-size":"11","font-weight":"800",fill:"#0f172a"});
+    const vt=(res.vendorName||"").length>17?(res.vendorName||"").slice(0,17)+"…":(res.vendorName||"");
+    t1.textContent=`${idx+1}. ${vt}`; bg2.appendChild(t1);
+
+    // date
+    const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
+    t2.textContent=res.deliveryDate||"日付未設定"; bg2.appendChild(t2);
+
+    // time or items
+    const t3=mk("text",{x:12,y:45,"font-size":"10",fill:"#6b7280"});
+    t3.textContent=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
+    bg2.appendChild(t3);
+
+    // status badge
+    const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
+    const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
+    const st=res.status||"予約中";
+    bg2.appendChild(mk("rect",{x:BW-56,y:4,width:52,height:16,rx:8,fill:sb2[st]||"#f1f5f9"}));
+    const st2=mk("text",{x:BW-30,y:15,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:sc2[st]||"#64748b"});
+    st2.textContent=st; bg2.appendChild(st2);
+
+    g.appendChild(bg2);
+    overlay.appendChild(g);
+  });
+  updateFsInfo();
+}
+
+function updateFsInfo(){
+  $("fsCnt").textContent=getPageRes().length+"件";
+  $("fsPageInfo").textContent=pdfDoc?`${curPage}/${pageCount}`:"-";
+}
+
+// ── Pointer events on overlay ──
+overlay.addEventListener("pointerdown",e=>{
+  if(e.button===2) return;
+  const groupEl=e.target.closest("g[data-id]");
+  const roleEl=e.target.closest("[data-role]");
+
+  if(groupEl){
+    const id=groupEl.getAttribute("data-id");
+    selId=id; redrawOverlay(); updateMapList();
+    if(roleEl){
+      const role=roleEl.getAttribute("data-role");
+      const res=reservations.find(r=>r.id===id);
+      if(res){
+        const p=svgPtFromEvent(e);
+        const _a=imgRatioToCanvasPx(res.markerX,res.markerY);
+        // baseDx/baseDy in canvas px — same as original system
+        const DEF_DX2 = 24  / (imgRect.iw * imgRect.sc);
+        const DEF_DY2 = -52 / (imgRect.ih * imgRect.sc);
+        pendingDrag={
+          id, role,
+          startX:p.x, startY:p.y,
+          baseAnchorX:_a.x, baseAnchorY:_a.y,
+          // stored as canvas px: ratio * (iw*sc)
+          baseDx:(res.bubbleDx ?? DEF_DX2) * imgRect.iw * imgRect.sc,
+          baseDy:(res.bubbleDy ?? DEF_DY2) * imgRect.ih * imgRect.sc,
+          pointerId:e.pointerId
+        };
+        overlay.setPointerCapture(e.pointerId);
+      }
+    }
+    e.preventDefault();
+  } else {
+    // empty area click → new reservation
+    const p=svgPtFromEvent(e);
+    openNewForm(p.x,p.y);
+    e.preventDefault();
+  }
+});
+
+overlay.addEventListener("pointermove",e=>{
+  if(pendingDrag&&!drag){
+    const p=svgPtFromEvent(e);
+    if(Math.hypot(p.x-pendingDrag.startX,p.y-pendingDrag.startY)>=DRAG_THR){
+      drag=pendingDrag; pendingDrag=null;
+    }
+  }
+  if(!drag) return;
+  const res=reservations.find(r=>r.id===drag.id); if(!res) return;
+  const p=svgPtFromEvent(e);
+  const rawDx=p.x-drag.startX, rawDy=p.y-drag.startY;
+
+  if(drag.role==="anchor"){
+    const np={x:clamp(drag.baseAnchorX+rawDx,0,stageW), y:clamp(drag.baseAnchorY+rawDy,0,stageH)};
+    const r=canvasPxToImgRatio(np.x,np.y);
+    res.markerX=clamp(r.x,0,1); res.markerY=clamp(r.y,0,1);
+  } else if(drag.role==="bubble"){
+    const nr=isFs?0:normalRot;
+    let ddx=rawDx, ddy=rawDy;
+    if(nr!==0){ const rad=-nr*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad); ddx=rawDx*cos-rawDy*sin; ddy=rawDx*sin+rawDy*cos; }
+    const isc=imgRect.iw*imgRect.sc, ihc=imgRect.ih*imgRect.sc;
+    res.bubbleDx=clamp(drag.baseDx+ddx,-isc,isc)/isc;
+    res.bubbleDy=clamp(drag.baseDy+ddy,-ihc,ihc)/ihc;
+  }
+  redrawOverlay();
+  e.preventDefault();
+});
+
+overlay.addEventListener("pointerup",async e=>{
+  if(pendingDrag){
+    try{ overlay.releasePointerCapture(pendingDrag.pointerId); }catch(_){}
+    // tap (no move) → show detail
+    showDetail(pendingDrag.id);
+    pendingDrag=null;
+  }
+  if(drag){
+    try{ overlay.releasePointerCapture(drag.pointerId); }catch(_){}
+    const res=reservations.find(r=>r.id===drag.id);
+    if(res){ await saveRes(res,false); }
+    drag=null;
+  }
+  e.preventDefault();
+});
+
+// ── Map list ──
+function updateMapList(){
+  const ml=$("mapList"), arr=getPageRes();
+  $("mapCnt").textContent=arr.length+"件";
+  if(arr.length===0){
+    ml.innerHTML=`<div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">${pdfDoc?"このページに予約はありません":"図面をアップロードしてください"}</div>`;
+    return;
+  }
+  ml.innerHTML="";
+  arr.forEach((res,i)=>{
+    const div=document.createElement("div");
+    div.className="mitem"+(res.id===selId?" selected":"");
+    div.dataset.id=res.id;
+    div.innerHTML=`
+      <div style="min-width:22px;height:22px;border-radius:50%;background:${vColor(res.vendorName||"")};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
+          ${esc(res.vendorName||"未設定")}
+          <span class="badge badge-${esc(res.status||"予約中")}">${esc(res.status||"予約中")}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(res.deliveryDate||"")} ${esc(res.timeStart||"")}${res.timeEnd?" 〜 "+esc(res.timeEnd):""} 　${esc((res.items||"").slice(0,28))}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn" style="padding:5px 8px;font-size:12px" data-act="edit">✏</button>
+        <button class="btn btn-danger" style="padding:5px 8px;font-size:12px" data-act="del">🗑</button>
+      </div>
+    `;
+    div.addEventListener("click",e2=>{
+      const act=e2.target.closest("[data-act]")?.dataset.act;
+      if(act==="edit"){ openEditForm(res.id); return; }
+      if(act==="del"){ confirmDel(res.id); return; }
+      selId=res.id; redrawOverlay(); updateMapList();
+    });
+    ml.appendChild(div);
+  });
+}
+
+// ── Reservation table ──
+function renderTable(){
+  const tbody=$("resTbody");
+  let arr=[...reservations];
+  const vf=$("fltVendorList").value, sf=$("fltStatus").value;
+  const df=$("fltFrom").value, dt=$("fltTo").value, pf=$("fltPage").value;
+  if(vf) arr=arr.filter(r=>r.vendorName===vf);
+  if(sf) arr=arr.filter(r=>(r.status||"予約中")===sf);
+  if(df) arr=arr.filter(r=>r.deliveryDate>=df);
+  if(dt) arr=arr.filter(r=>r.deliveryDate<=dt);
+  if(pf) arr=arr.filter(r=>`${r.pdfPage||1}ページ`===pf);
+  arr.sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
+  if(!arr.length){ tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">予約はありません</td></tr>`; return; }
+  tbody.innerHTML=arr.map((r,i)=>`<tr>
+    <td style="font-weight:700;color:var(--muted)">${i+1}</td>
+    <td style="font-weight:700;white-space:nowrap">${esc(r.deliveryDate||"-")}</td>
+    <td style="white-space:nowrap;font-size:12px">${esc(r.timeStart||"-")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}</td>
+    <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
+    <td style="font-size:12px">${esc(r.contactPerson||"-")}<br><span style="color:var(--muted)">${esc(r.phone||"")}</span></td>
+    <td style="font-size:12px">${esc(r.floor||"-")}<br><span style="color:var(--muted);font-size:11px">P.${r.pdfPage||1}</span></td>
+    <td style="font-size:12px;max-width:160px">${esc((r.items||"-").slice(0,50))}</td>
+    <td style="font-size:12px">${esc(r.vehicleType||"-")}</td>
+    <td><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span></td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn" style="padding:5px 9px;font-size:12px" onclick="openEditForm('${r.id}')">✏</button>
+      <button class="btn btn-danger" style="padding:5px 9px;font-size:12px" onclick="confirmDel('${r.id}')">🗑</button>
+    </div></td>
+  </tr>`).join("");
+}
+
+// ── Stats & filters ──
+function updateStats(){
+  $("sTotal").textContent=reservations.length;
+  $("sActive").textContent=reservations.filter(r=>(r.status||"予約中")==="予約中").length;
+  $("sDone").textContent=reservations.filter(r=>r.status==="完了").length;
+  $("sCancel").textContent=reservations.filter(r=>r.status==="キャンセル").length;
+}
+function updateVendorSelects(){
+  const vendors=[...new Set(reservations.map(r=>r.vendorName).filter(Boolean))].sort();
+  ["fltVendorMap","fltVendorList"].forEach(id=>{
+    const s=$(id), cur=s.value;
+    s.innerHTML=`<option value="">${id==="fltVendorMap"?"全業者表示":"全て"}</option>`;
+    vendors.forEach(v=>{ const o=document.createElement("option"); o.value=o.textContent=v; s.appendChild(o); });
+    if(cur) s.value=cur;
+  });
+}
+function updatePageFilter(){
+  const pages=[...new Set(reservations.map(r=>`${r.pdfPage||1}ページ`))].sort();
+  const s=$("fltPage"), cur=s.value;
+  s.innerHTML=`<option value="">全て</option>`;
+  pages.forEach(p=>{ const o=document.createElement("option"); o.value=o.textContent=p; s.appendChild(o); });
+  if(cur) s.value=cur;
+}
+function onDataUpdate(){
+  redrawOverlay(); updateMapList(); renderTable(); updateStats(); updateVendorSelects(); updatePageFilter();
+}
+
+// ── Firebase / LS CRUD ──
+async function loadReservations(){
+  if(usingFb){
+    if(dbUnsub) dbUnsub();
+    dbUnsub=db.collection("reservations").orderBy("createdAt","desc")
+      .onSnapshot(snap=>{
+        reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+        onDataUpdate();
+      }, err=>{ console.error(err); setConn(false); reservations=lsLoad(); onDataUpdate(); });
+  } else {
+    reservations=lsLoad(); onDataUpdate();
+  }
+}
+async function saveRes(data,isNew=true){
+  if(usingFb){
+    try{
+      // Firestoreドキュメント本体には id を含めない（ドキュメントIDとして管理するため）
+      const {id: _id, ...docData} = data;
+      if(isNew){
+        const ref=await db.collection("reservations").add({
+          ...docData,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        data.id=ref.id;
+      } else {
+        await db.collection("reservations").doc(data.id).set({
+          ...docData,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true});
+      }
+    }catch(e){ console.error(e); toast("保存エラー: "+e.message); }
+  } else {
+    const arr=lsLoad();
+    if(isNew){ data.id="ls_"+Date.now()+"_"+Math.random().toString(16).slice(2); data.createdAt=Date.now(); arr.unshift(data); }
+    else { const i=arr.findIndex(r=>r.id===data.id); if(i>=0)arr[i]=data; else arr.unshift(data); }
+    lsSave(arr); reservations=arr; onDataUpdate();
+  }
+}
+async function deleteRes(id){
+  if(usingFb){
+    try{ await db.collection("reservations").doc(id).delete(); }catch(e){ toast("削除エラー: "+e.message); }
+  } else { const arr=lsLoad().filter(r=>r.id!==id); lsSave(arr); reservations=arr; onDataUpdate(); }
+}
+
+// ── Form modal ──
+let editingId=null, pendingMx=null, pendingMy=null;
+
+function openNewForm(canX,canY){
+  editingId=null; pendingMx=canX; pendingMy=canY;
+  $("formTitle").textContent="📦 搬入予約を追加";
+  clearForm(); $("fDate").value=new Date().toISOString().slice(0,10);
+  $("fPage").value=curPage; $("statusField").style.display="none";
+  $("formModal").classList.add("open");
+}
+function openEditForm(id){
+  const r=reservations.find(x=>x.id===id); if(!r) return;
+  editingId=id; pendingMx=null; pendingMy=null;
+  $("formTitle").textContent="✏️ 予約を編集";
+  $("fId").value=id;
+  $("fVendor").value=r.vendorName||"";
+  $("fContact").value=r.contactPerson||"";
+  $("fPhone").value=r.phone||"";
+  $("fDate").value=r.deliveryDate||"";
+  $("fTs").value=r.timeStart||""; $("fTe").value=r.timeEnd||"";
+  $("fFloor").value=r.floor||""; $("fVehicle").value=r.vehicleType||"";
+  $("fItems").value=r.items||""; $("fNotes").value=r.notes||"";
+  $("fStatus").value=r.status||"予約中"; $("statusField").style.display="block";
+  $("formModal").classList.add("open");
+}
+window.openEditForm=openEditForm;
+
+function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fTs","fTe","fFloor","fItems","fNotes"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
+function closeForm(){ $("formModal").classList.remove("open"); editingId=null; pendingMx=pendingMy=null; }
+
+$("formClose").addEventListener("click",closeForm);
+$("formCancel").addEventListener("click",closeForm);
+$("formModal").addEventListener("click",e=>{ if(e.target===$("formModal"))closeForm(); });
+
+$("formSave").addEventListener("click",async()=>{
+  const vendorName=$("fVendor").value.trim();
+  const deliveryDate=$("fDate").value;
+  const items=$("fItems").value.trim();
+  if(!vendorName){ toast("業者名を入力してください"); $("fVendor").focus(); return; }
+  if(!deliveryDate){ toast("搬入日を入力してください"); $("fDate").focus(); return; }
+  if(!items){ toast("搬入品目を入力してください"); $("fItems").focus(); return; }
+
+  const isNew=!editingId;
+  let markerX,markerY,bubbleDx,bubbleDy;
+  if(isNew&&pendingMx!=null){
+    const r=canvasPxToImgRatio(pendingMx,pendingMy);
+    markerX=clamp(r.x,0,1); markerY=clamp(r.y,0,1);
+    // Default offset: 24px right, 52px up — same as original system
+    bubbleDx = 24  / (imgRect.iw * imgRect.sc);
+    bubbleDy = -52 / (imgRect.ih * imgRect.sc);
+  } else if(!isNew){
+    const ex=reservations.find(r=>r.id===editingId);
+    markerX=ex?.markerX; markerY=ex?.markerY;
+    const DEF_DX3 = 24  / (imgRect.iw * imgRect.sc);
+    const DEF_DY3 = -52 / (imgRect.ih * imgRect.sc);
+    bubbleDx=ex?.bubbleDx ?? DEF_DX3;
+    bubbleDy=ex?.bubbleDy ?? DEF_DY3;
+  }
+
+  const data={
+    vendorName, contactPerson:$("fContact").value.trim(), phone:$("fPhone").value.trim(),
+    deliveryDate, timeStart:$("fTs").value, timeEnd:$("fTe").value,
+    floor:$("fFloor").value.trim(), vehicleType:$("fVehicle").value,
+    items, notes:$("fNotes").value.trim(),
+    status:$("fStatus").value||"予約中",
+    pdfPage:parseInt($("fPage").value)||curPage,
+    markerX, markerY, bubbleDx, bubbleDy
+  };
+  if(!isNew) data.id=editingId;
+
+  const btn=$("formSave"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span> 保存中…`;
+  try{ await saveRes(data,isNew); closeForm(); toast(isNew?"予約を追加しました ✅":"予約を更新しました ✅"); }
+  finally{ btn.disabled=false; btn.innerHTML=`<span>💾 保存</span>`; }
+});
+
+// ── Detail modal ──
+function showDetail(id){
+  const r=reservations.find(x=>x.id===id); if(!r) return;
+  $("detailBody").innerHTML=`
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px;line-height:1.6">
+      <span style="color:var(--muted)">業者名</span><strong>${esc(r.vendorName||"-")}</strong>
+      <span style="color:var(--muted)">担当者</span><span>${esc(r.contactPerson||"-")}</span>
+      <span style="color:var(--muted)">電話番号</span><span>${esc(r.phone||"-")}</span>
+      <span style="color:var(--muted)">搬入日</span><strong>${esc(r.deliveryDate||"-")}</strong>
+      <span style="color:var(--muted)">時間</span><span>${esc(r.timeStart||"-")} 〜 ${esc(r.timeEnd||"-")}</span>
+      <span style="color:var(--muted)">場所</span><span>${esc(r.floor||"-")}</span>
+      <span style="color:var(--muted)">車両</span><span>${esc(r.vehicleType||"-")}</span>
+      <span style="color:var(--muted)">品目</span><span style="white-space:pre-wrap">${esc(r.items||"-")}</span>
+      <span style="color:var(--muted)">備考</span><span style="white-space:pre-wrap">${esc(r.notes||"-")}</span>
+      <span style="color:var(--muted)">ページ</span><span>${r.pdfPage||1}ページ目</span>
+      <span style="color:var(--muted)">ステータス</span><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span>
+    </div>`;
+  $("detailEdit").onclick=()=>{ closeDetail(); openEditForm(id); };
+  $("detailDel").onclick=()=>{ closeDetail(); confirmDel(id); };
+  $("detailModal").classList.add("open");
+}
+function closeDetail(){ $("detailModal").classList.remove("open"); }
+$("detailClose").addEventListener("click",closeDetail);
+$("detailClose2").addEventListener("click",closeDetail);
+$("detailModal").addEventListener("click",e=>{ if(e.target===$("detailModal"))closeDetail(); });
+
+// ── Delete ──
+window.confirmDel=function(id){
+  const r=reservations.find(x=>x.id===id); if(!r) return;
+  if(confirm(`「${r.vendorName}」の予約 (${r.deliveryDate}) を削除しますか？`))
+    deleteRes(id).then(()=>toast("削除しました"));
+};
+
+// ── Tabs ──
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-pane").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    $("tab-"+btn.dataset.tab).classList.add("active");
+    if(btn.dataset.tab==="list") renderTable();
+  });
+});
+
+// ── Filter events ──
+["fltVendorMap","fltDateMap"].forEach(id=>$(id).addEventListener("change",()=>{ redrawOverlay(); updateMapList(); }));
+["fltVendorList","fltStatus","fltFrom","fltTo","fltPage"].forEach(id=>$(id).addEventListener("change",renderTable));
+$("btnClearFlt").addEventListener("click",()=>{
+  ["fltVendorList","fltStatus","fltFrom","fltTo","fltPage"].forEach(id=>$(id).value="");
+  renderTable();
+});
+
+// ── CSV export ──
+$("btnCsv").addEventListener("click",()=>{
+  const headers=["No.","搬入日","開始","終了","業者名","担当者","電話","フロア","品目","車両","ステータス","備考"];
+  const rows=reservations.map((r,i)=>[i+1,r.deliveryDate||"",r.timeStart||"",r.timeEnd||"",r.vendorName||"",r.contactPerson||"",r.phone||"",r.floor||"",r.items||"",r.vehicleType||"",r.status||"予約中",r.notes||""]);
+  const csv=[headers,...rows].map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`搬入予約_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); toast("CSVをダウンロードしました");
+});
+$("btnPrint").addEventListener("click",()=>window.print());
+
+// ── Boot ──
+loadReservations();
+resizeStage();
+toast("搬入予約システムへようこそ。PDFをアップロードして予約を開始してください。", 5000);
+</script>
+
+</body>
+</html>
