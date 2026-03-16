@@ -204,6 +204,7 @@
         <div style="display:flex;gap:6px;align-self:flex-end">
           <button class="btn" id="btnRotL" title="左90°" style="padding:8px 12px;font-size:18px">↺</button>
           <button class="btn" id="btnRotR" title="右90°" style="padding:8px 12px;font-size:18px">↻</button>
+          <button class="btn btn-primary" id="btnSaveImg" title="図面+マーカーを画像保存" style="padding:8px 14px;font-size:13px">💾 画像保存</button>
         </div>
         <span style="font-size:12px;color:var(--muted);align-self:flex-end;white-space:nowrap">図面をクリック → 予約追加</span>
       </div>
@@ -1134,6 +1135,139 @@ $("btnCsv").addEventListener("click",()=>{
   a.click(); toast("CSVをダウンロードしました");
 });
 $("btnPrint").addEventListener("click",()=>window.print());
+
+// ── PNG Export (図面 + マーカー + 吹き出し合成) ──
+async function saveImage(){
+  const btn=$("btnSaveImg");
+  btn.disabled=true; btn.textContent="⏳ 生成中…";
+  try{
+    const scale=2; // 高解像度出力（2倍）
+    const out=document.createElement("canvas");
+    out.width=stageW*scale; out.height=stageH*scale;
+    const octx=out.getContext("2d");
+
+    // ── 背景（PDF or グリッド）を描画 ──
+    octx.fillStyle="#ffffff"; octx.fillRect(0,0,out.width,out.height);
+    octx.drawImage(bgCanvas,0,0,out.width,out.height);
+
+    // ── マーカー・吹き出しをCanvas 2D APIで直接描画 ──
+    const arr=getPageRes();
+    const DEF_DX=24/(imgRect.iw*imgRect.sc);
+    const DEF_DY=-52/(imgRect.ih*imgRect.sc);
+
+    arr.forEach((res,idx)=>{
+      if(res.markerX==null||res.markerY==null) return;
+      const color=vColor(res.vendorName||"その他");
+      const isSel=res.id===selId;
+
+      // アンカー位置
+      const _a=imgRatioToCanvasPx(res.markerX,res.markerY);
+      const ax=_a.x*scale, ay=_a.y*scale;
+
+      // 吹き出し位置（top-left）
+      const bdx=res.bubbleDx??DEF_DX, bdy=res.bubbleDy??DEF_DY;
+      const _b=imgRatioToCanvasPx(res.markerX+bdx,res.markerY+bdy);
+      const bx=_b.x*scale, by=_b.y*scale;
+      const bw=BW*scale, bh=BH*scale;
+      const bcx=bx+bw/2, bcy=by+bh/2;
+
+      // 線（アンカー→吹き出し中心）
+      octx.beginPath(); octx.moveTo(ax,ay); octx.lineTo(bcx,bcy);
+      octx.strokeStyle=color; octx.lineWidth=1.8*scale;
+      octx.globalAlpha=0.75; octx.setLineDash([4*scale,2*scale]);
+      octx.stroke(); octx.setLineDash([]); octx.globalAlpha=1;
+
+      // アンカー円
+      octx.beginPath(); octx.arc(ax,ay,9*scale,0,Math.PI*2);
+      octx.fillStyle=color; octx.fill();
+      octx.strokeStyle=isSel?"#0ea5e9":"white"; octx.lineWidth=isSel?3*scale:2*scale;
+      octx.stroke();
+
+      // アンカー番号
+      octx.fillStyle="#ffffff"; octx.textAlign="center"; octx.textBaseline="middle";
+      octx.font=`bold ${10*scale}px system-ui,sans-serif`;
+      octx.fillText(String(idx+1),ax,ay);
+
+      // 吹き出し影
+      octx.fillStyle="rgba(0,0,0,0.07)";
+      roundRect(octx,bx+2*scale,by+2*scale,bw,bh,11*scale);
+      octx.fill();
+
+      // 吹き出し背景
+      octx.fillStyle="#ffffff";
+      roundRect(octx,bx,by,bw,bh,11*scale);
+      octx.fill();
+      octx.strokeStyle=isSel?"#0ea5e9":color; octx.lineWidth=isSel?2.5*scale:1.5*scale;
+      octx.stroke();
+
+      // 左アクセントバー
+      octx.fillStyle=color;
+      roundRect(octx,bx,by,5*scale,bh,3*scale);
+      octx.fill();
+
+      // ステータスバッジ
+      const st=res.status||"予約中";
+      const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
+      const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
+      octx.fillStyle=sb2[st]||"#f1f5f9";
+      roundRect(octx,bx+(BW-56)*scale,by+4*scale,52*scale,16*scale,8*scale);
+      octx.fill();
+      octx.fillStyle=sc2[st]||"#64748b"; octx.textAlign="center"; octx.textBaseline="middle";
+      octx.font=`bold ${9*scale}px system-ui,sans-serif`;
+      octx.fillText(st,bx+(BW-30)*scale,by+12*scale);
+
+      // 業者名
+      octx.fillStyle="#0f172a"; octx.textAlign="left"; octx.textBaseline="alphabetic";
+      octx.font=`bold ${11*scale}px system-ui,sans-serif`;
+      const vt=(res.vendorName||"").length>17?(res.vendorName||"").slice(0,17)+"…":(res.vendorName||"");
+      octx.fillText(`${idx+1}. ${vt}`,bx+12*scale,by+19*scale);
+
+      // 搬入日
+      octx.fillStyle="#374151"; octx.font=`${10*scale}px system-ui,sans-serif`;
+      octx.fillText(res.deliveryDate||"日付未設定",bx+12*scale,by+32*scale);
+
+      // 時間 or 品目
+      octx.fillStyle="#6b7280";
+      const t3txt=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
+      octx.fillText(t3txt,bx+12*scale,by+45*scale);
+    });
+
+    // ── 透かし（ページ情報）── 
+    const pageLabel=pdfDoc?`P.${curPage}/${pageCount}`:"";
+    const dateLabel=new Date().toLocaleDateString("ja-JP");
+    octx.fillStyle="rgba(100,116,139,0.6)"; octx.textAlign="right"; octx.textBaseline="bottom";
+    octx.font=`${11*scale}px system-ui,sans-serif`;
+    octx.fillText(`搬入予約図面 ${pageLabel}　${dateLabel}`,out.width-8*scale,out.height-6*scale);
+
+    // ── ダウンロード ──
+    out.toBlob(blob=>{
+      if(!blob){ toast("画像生成に失敗しました"); return; }
+      const a=document.createElement("a");
+      const pg=pdfDoc?`_P${curPage}`:"";
+      const dt=new Date().toISOString().slice(0,10);
+      a.download=`搬入予約図面${pg}_${dt}.png`;
+      a.href=URL.createObjectURL(blob);
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      toast("画像を保存しました 📷");
+    },"image/png");
+
+  }catch(e){ console.error(e); toast("保存エラー: "+e.message); }
+  finally{ btn.disabled=false; btn.textContent="💾 画像保存"; }
+}
+
+// 角丸矩形ヘルパー
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+$("btnSaveImg").addEventListener("click",saveImage);
 
 // ── Boot ──
 loadReservations();
