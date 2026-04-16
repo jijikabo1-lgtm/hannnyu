@@ -3,12 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>搬入予約システム</title>
+  <title>搬入管理システム</title>
 
-  <!-- Firebase SDK (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <!-- PDF.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
@@ -21,12 +18,10 @@
       --brand: #0ea5e9;
       --brand2: #0284c7;
       --ok: #22c55e;
-      --warn: #f59e0b;
+      --warn: #f97316;
       --danger: #ef4444;
       --shadow: 0 4px 24px rgba(0,0,0,.07);
       --radius: 14px;
-      --bubble-w: 172px;
-      --bubble-h: 60px;
     }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,'Segoe UI','Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
@@ -36,18 +31,17 @@
     .hdr-logo{font-size:17px;font-weight:800;padding:14px 0;white-space:nowrap}
     .hdr-pdf{display:flex;align-items:center;gap:8px;padding:8px 0}
     .hdr-pdf label{font-size:12px;color:rgba(255,255,255,.65);white-space:nowrap}
-    .hdr-pdf input{font-size:12px;color:rgba(255,255,255,.9)}
     .page-nav{display:flex;align-items:center;gap:6px}
     .page-nav button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px;transition:background .15s}
     .page-nav button:hover{background:rgba(255,255,255,.28)}
     .page-nav button:disabled{opacity:.35;cursor:not-allowed}
-    .page-lbl{font-size:13px;color:rgba(255,255,255,.8);white-space:nowrap;min-width:90px;text-align:center}
+    .page-lbl{font-size:13px;color:rgba(255,255,255,.8);white-space:nowrap;min-width:80px;text-align:center}
     .conn{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.65);margin-left:auto;padding:8px 0}
     .conn-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0}
     .conn-dot.on{background:#4ade80}
     .conn-dot.off{background:#f87171}
 
-    /* ── Tabs ── */
+    /* ── Main tabs ── */
     .tabs{background:var(--card);border-bottom:2px solid var(--border);display:flex;gap:2px;padding:0 18px}
     .tab-btn{padding:11px 20px;border:none;background:none;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0;transition:all .15s}
     .tab-btn:hover{color:var(--brand);background:#f0f9ff}
@@ -55,117 +49,149 @@
     .tab-pane{display:none}
     .tab-pane.active{display:block}
 
+    /* ── Round tabs ── */
+    .rtabs-bar{background:var(--card);border-bottom:1px solid var(--border);padding:0 18px;display:flex;align-items:center;gap:0;overflow-x:auto;position:sticky;top:52px;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+    .rtab-btn{padding:9px 16px;border:none;background:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+    .rtab-btn:hover{color:var(--brand);background:#f0f9ff}
+    .rtab-btn.active{color:var(--brand);border-bottom-color:var(--brand)}
+    .rtab-del{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(100,116,139,.15);border:none;cursor:pointer;font-size:10px;color:var(--muted);line-height:1;flex-shrink:0}
+    .rtab-del:hover{background:var(--danger);color:#fff}
+    .rtab-add{padding:7px 12px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;margin:6px 0 6px 8px;white-space:nowrap;transition:all .15s;flex-shrink:0}
+    .rtab-add:hover{border-color:var(--brand);color:var(--brand)}
+
     /* ── Layout ── */
-    .wrap{max-width:1800px;margin:0 auto;padding:16px 18px}
+    .wrap{max-width:1800px;margin:0 auto;padding:14px 18px}
+    .map-layout{display:flex;gap:14px;align-items:flex-start}
+    .map-col{flex:1;min-width:0}
+    .tl-col{width:300px;flex-shrink:0}
+    @media(max-width:860px){.map-layout{flex-direction:column}.tl-col{width:100%}}
     .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
-    .card-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .card-hdr h2{font-size:15px;font-weight:700}
-    .card-body{padding:16px}
+    .card-hdr{padding:11px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .card-hdr h2{font-size:14px;font-weight:700}
+    .card-body{padding:14px}
 
     /* ── Buttons ── */
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .btn{display:inline-flex;align-items:center;gap:5px;padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
     .btn:hover{border-color:#94a3b8;background:#f8fafc}
     .btn:disabled{opacity:.4;cursor:not-allowed}
     .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
     .btn-primary:hover{background:var(--brand2);border-color:var(--brand2)}
-    .btn-ok{background:var(--ok);border-color:var(--ok);color:#fff}
     .btn-danger{background:var(--danger);border-color:var(--danger);color:#fff}
-    .btn-warn{background:var(--warn);border-color:var(--warn);color:#fff}
+    .btn-danger:hover{background:#dc2626;border-color:#dc2626}
+    .btn-sm{padding:5px 8px;font-size:12px;border-radius:7px}
 
     /* ── Form ── */
-    .field{display:flex;flex-direction:column;gap:5px}
+    .field{display:flex;flex-direction:column;gap:4px}
     .field label{font-size:12px;font-weight:600;color:var(--muted)}
-    .field input,.field select,.field textarea{border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:14px;background:#fff;transition:border-color .15s;width:100%}
-    .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
-    .field textarea{min-height:66px;resize:vertical}
-    .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .field input,.field textarea{border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:14px;background:#fff;transition:border-color .15s;width:100%}
+    .field input:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
+    .field textarea{min-height:64px;resize:vertical}
+    .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
     .fgrid .full{grid-column:1/-1}
     .req{color:var(--danger)}
+    @media(max-width:480px){.fgrid{grid-template-columns:1fr}}
 
     /* ── Stage ── */
     .stage-wrap{position:relative;background:#fff;border-radius:10px;border:1px dashed #cbd5e1;overflow:hidden;aspect-ratio:16/9}
     canvas#bg{position:absolute;top:0;left:0;display:block}
     svg#overlay{position:absolute;top:0;left:0;touch-action:none}
-    .fs-btn{position:absolute;top:10px;right:10px;z-index:10;background:rgba(15,23,42,.72);color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:600;backdrop-filter:blur(4px)}
+    .fs-btn{position:absolute;top:8px;right:8px;z-index:10;background:rgba(15,23,42,.72);color:#fff;border:none;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:12px;font-weight:600;backdrop-filter:blur(4px)}
     .stage-wrap.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;border-radius:0;border:none;aspect-ratio:unset}
-    .stage-wrap.fullscreen.rot90 {transform:rotate(90deg);width:100vh;height:100vw;top:calc((100vh - 100vw)/2);left:calc((100vw - 100vh)/2)}
+    .stage-wrap.fullscreen.rot90{transform:rotate(90deg);width:100vh;height:100vw;top:calc((100vh - 100vw)/2);left:calc((100vw - 100vh)/2)}
     .stage-wrap.fullscreen.rot180{transform:rotate(180deg)}
     .stage-wrap.fullscreen.rot270{transform:rotate(270deg);width:100vh;height:100vw;top:calc((100vh - 100vw)/2);left:calc((100vw - 100vh)/2)}
-    .stage-hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.72);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;pointer-events:none;white-space:nowrap}
+    .stage-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.72);color:#fff;padding:5px 13px;border-radius:20px;font-size:12px;pointer-events:none;white-space:nowrap}
 
-    /* ── Map list ── */
-    .mitem{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer}
-    .mitem:last-child{border-bottom:none}
-    .mitem:hover{background:#f8fafc}
-    .mitem.selected{background:#eff6ff}
+    /* ── Timeline panel ── */
+    .tl-header{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .tl-header h3{font-size:14px;font-weight:700}
+    .tl-cnt{font-size:12px;color:var(--muted)}
+    .tl-list{overflow-y:auto;max-height:calc(100vh - 300px);min-height:160px}
+    .tl-entry{display:flex;gap:9px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-left:3px solid transparent}
+    .tl-entry:last-child{border-bottom:none}
+    .tl-entry:hover{background:#f8fafc}
+    .tl-entry.overlap{background:#fff7ed;border-left-color:var(--warn)}
+    .tl-entry.sel{background:#eff6ff;border-left-color:var(--brand)}
+    .tl-num{min-width:20px;height:20px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px}
+    .tl-entry.overlap .tl-num{background:var(--warn)}
+    .tl-body{flex:1;min-width:0}
+    .tl-time{font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+    .tl-items{font-size:12px;color:#374151;margin-top:2px;word-break:break-word}
+    .tl-notes{font-size:11px;color:var(--muted);margin-top:1px}
+    .tl-date{font-size:11px;color:var(--muted);margin-top:2px}
+    .tl-acts{display:flex;gap:3px;flex-shrink:0}
+    .ov-badge{font-size:9px;font-weight:700;background:#fff3cd;color:#856404;padding:1px 5px;border-radius:4px;white-space:nowrap}
+    .tl-empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8}
 
-    /* ── Status badges ── */
-    .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
-    .badge-予約中{background:#dbeafe;color:#1d4ed8}
-    .badge-完了{background:#dcfce7;color:#15803d}
-    .badge-キャンセル{background:#fee2e2;color:#b91c1c}
-
-    /* ── Table ── */
+    /* ── List tab table ── */
     .rtable{width:100%;border-collapse:collapse;font-size:13px}
-    .rtable th{padding:10px 12px;text-align:left;font-weight:700;background:#f8fafc;border-bottom:2px solid var(--border);white-space:nowrap;color:var(--muted);font-size:12px}
-    .rtable td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .rtable th{padding:9px 11px;text-align:left;font-weight:700;background:#f8fafc;border-bottom:2px solid var(--border);white-space:nowrap;color:var(--muted);font-size:12px}
+    .rtable td{padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:middle}
     .rtable tr:hover td{background:#f8fafc}
     .rtable tr:last-child td{border-bottom:none}
+    .rtable tr.row-ov td{background:#fff7ed}
+    .stat-box{background:#f8fafc;border:1px solid var(--border);border-radius:11px;padding:11px 15px;text-align:center;min-width:86px}
+    .stat-num{font-size:22px;font-weight:800}
+    .stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
 
     /* ── Modal ── */
     .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:5000;justify-content:center;align-items:center;padding:16px}
     .modal-bg.open{display:flex}
-    .modal{background:var(--card);border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,0,0,.28);width:100%;max-width:660px;max-height:92vh;overflow-y:auto}
-    .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-    .modal-hdr h3{font-size:16px;font-weight:700}
-    .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:6px;line-height:1}
+    .modal{background:var(--card);border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,0,0,.28);width:100%;max-width:440px;max-height:92vh;overflow-y:auto}
+    .modal-hdr{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+    .modal-hdr h3{font-size:15px;font-weight:700}
+    .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:3px 7px;border-radius:6px;line-height:1}
     .modal-close:hover{background:#f1f5f9}
-    .modal-body{padding:20px}
-    .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+    .modal-body{padding:18px}
+    .modal-footer{padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
 
-    /* ── Stats ── */
-    .stat-box{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:12px 16px;text-align:center;min-width:90px}
-    .stat-num{font-size:24px;font-weight:800}
-    .stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
-
-    /* ── Config warning ── */
-    .cfg-warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;font-size:13px;color:#c2410c;margin-bottom:14px;display:none}
-
-    /* ── Toast ── */
-    .toast{position:fixed;bottom:20px;right:20px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:12px;box-shadow:var(--shadow);font-size:14px;display:none;max-width:360px;z-index:9999;line-height:1.5}
-
-    /* ── Spinner ── */
-    .spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+    /* ── Toast & Spinner ── */
+    .toast{position:fixed;bottom:20px;right:20px;background:#0f172a;color:#fff;padding:10px 15px;border-radius:11px;box-shadow:var(--shadow);font-size:14px;display:none;max-width:340px;z-index:9999;line-height:1.5}
+    .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* ── Fullscreen FS panel ── */
-    #fsPanel{display:none;position:fixed;z-index:2000;background:rgba(17,24,39,.88);backdrop-filter:blur(12px);border-radius:20px;padding:10px 18px;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:96vw;cursor:grab;user-select:none;touch-action:none}
+    /* ── Fullscreen floating panel ── */
+    #fsPanel{display:none;position:fixed;z-index:2000;background:rgba(17,24,39,.88);backdrop-filter:blur(12px);border-radius:18px;padding:10px 16px;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:96vw;cursor:grab;user-select:none;touch-action:none}
     #fsPanel.show{display:flex}
-    #fsPanel label{font-size:11px;color:#94a3b8;margin-bottom:2px;display:block}
-    #fsPanel select{background:#1e293b;color:#f1f5f9;border:1px solid #334155;border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600}
-    #fsPanel .sep{width:1px;height:38px;background:#334155;flex-shrink:0}
+    #fsPanel label{font-size:10px;color:#94a3b8;margin-bottom:2px;display:block}
+    #fsPanel .sep{width:1px;height:34px;background:#334155;flex-shrink:0}
     #fsPanel .fsfield{display:flex;flex-direction:column;gap:2px}
     .fscount{font-size:12px;color:#64748b;white-space:nowrap}
 
-    /* Print */
-    @media print{.hdr,.tabs,.card-hdr .btn,.btn,.stage-wrap,.cfg-warn,.toast{display:none!important}.rtable{font-size:11px}.badge{border:1px solid #ccc}}
+    /* ── Controls bar ── */
+    .ctrl-bar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:9px 13px;border-bottom:1px solid var(--border)}
 
+    /* ── Pin-add mode ── */
+    .pin-banner{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:7px 11px;font-size:12px;color:#15803d;font-weight:600;display:none;margin:8px 12px 0;align-items:center;gap:6px;cursor:pointer}
+    .pin-banner.show{display:flex}
+    .pin-banner:hover{background:#dcfce7}
+    .tl-entry.pin-mode{background:#f0fdf4;border-left-color:#22c55e}
+    .tl-entry.pin-mode .tl-num{background:#22c55e}
+    .btn-pin{background:#f0fdf4;color:#15803d;border-color:#86efac}
+    .btn-pin:hover,.btn-pin.active{background:#22c55e;color:#fff;border-color:#22c55e}
+
+    /* Print */
+    @media print{.hdr,.tabs,.rtabs-bar,.ctrl-bar,.btn,.toast{display:none!important}.rtable{font-size:11px}}
     /* Mobile */
-    @media(max-width:640px){.fgrid{grid-template-columns:1fr}.wrap{padding:10px 12px}.tabs{padding:0 12px}.hdr{padding:0 12px}.card-body{padding:12px}}
+    @media(max-width:640px){.wrap{padding:10px 10px}.hdr{padding:0 10px}.tabs{padding:0 10px}.rtabs-bar{padding:0 10px}}
+
+    /* cfg warn */
+    .cfg-warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:11px 14px;font-size:13px;color:#c2410c;margin-bottom:12px;display:none}
   </style>
 </head>
 <body>
 
 <!-- ════ HEADER ════ -->
 <header class="hdr">
-  <div class="hdr-logo">🏗 搬入予約システム</div>
+  <div class="hdr-logo">🏗 搬入管理</div>
   <div class="hdr-pdf">
     <label>図面PDF</label>
     <input id="pdfInput" type="file" accept="application/pdf" />
+    <span id="pdfShareBadge" style="display:none;font-size:11px;color:#4ade80;font-weight:600;white-space:nowrap"></span>
   </div>
   <div class="page-nav">
     <button id="btnPrev" disabled>◀</button>
-    <span class="page-lbl" id="pageInfo">PDF未選択</span>
+    <span class="page-lbl" id="pageInfo">未選択</span>
     <button id="btnNext" disabled>▶</button>
   </div>
   <div class="conn" id="connWrap">
@@ -174,63 +200,62 @@
   </div>
 </header>
 
-<!-- ════ TABS ════ -->
+<!-- ════ MAIN TABS ════ -->
 <div class="tabs">
-  <button class="tab-btn active" data-tab="map">📐 図面・予約</button>
-  <button class="tab-btn" data-tab="list">📋 予約一覧</button>
+  <button class="tab-btn active" data-tab="map">📐 図面・搬入</button>
+  <button class="tab-btn" data-tab="list">📋 一覧</button>
 </div>
 
-<!-- ════ MAIN ════ -->
+<!-- ════ ROUND TABS ════ -->
+<div class="rtabs-bar" id="rtabsBar">
+  <div id="roundTabs" style="display:flex;align-items:center;flex:1;min-width:0;overflow-x:auto"></div>
+  <button class="rtab-add" id="btnAddRound">＋ 階を追加</button>
+</div>
+
+<!-- ════ WRAP ════ -->
 <div class="wrap">
   <div class="cfg-warn" id="cfgWarn">
-    ⚠️ <strong>Firebase 未設定</strong> — <code>index.html</code> の <strong>FIREBASE CONFIG</strong> に設定を入力してください。現在はこのブラウザのみで動作しています（他ユーザーと共有されません）。
+    ⚠️ <strong>Firebase 未設定</strong> — ローカルモードで動作中（他端末と共有されません）。
   </div>
 
   <!-- ── MAP TAB ── -->
   <div class="tab-pane active" id="tab-map">
-    <div class="card">
-      <!-- controls bar -->
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:12px 16px;border-bottom:1px solid var(--border)">
-        <div class="field" style="flex:1;min-width:150px">
-          <label>業者フィルター</label>
-          <select id="fltVendorMap" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px">
-            <option value="">全業者表示</option>
-          </select>
-        </div>
-        <div class="field" style="min-width:150px">
-          <label>日付フィルター</label>
-          <input type="date" id="fltDateMap" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" />
-        </div>
-        <div style="display:flex;gap:6px;align-self:flex-end">
-          <button class="btn" id="btnRotL" title="左90°" style="padding:8px 12px;font-size:18px">↺</button>
-          <button class="btn" id="btnRotR" title="右90°" style="padding:8px 12px;font-size:18px">↻</button>
-          <button class="btn btn-primary" id="btnSaveImg" title="図面+マーカーを画像保存" style="padding:8px 14px;font-size:13px">💾 画像保存</button>
-        </div>
-        <span style="font-size:12px;color:var(--muted);align-self:flex-end;white-space:nowrap">図面をクリック → 予約追加</span>
-      </div>
+    <div class="map-layout">
 
-      <!-- stage -->
-      <div style="padding:12px 16px">
-        <div class="stage-wrap" id="stageWrap">
-          <canvas id="bg"></canvas>
-          <svg id="overlay"></svg>
-          <button class="fs-btn" id="btnFs">⛶ 全画面</button>
-          <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
-        </div>
-      </div>
-
-      <!-- page reservation list -->
-      <div style="padding:0 16px 16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <strong style="font-size:14px">このページの予約</strong>
-          <span id="mapCnt" style="font-size:12px;color:var(--muted)">0件</span>
-        </div>
-        <div style="border:1px solid var(--border);border-radius:10px;max-height:260px;overflow-y:auto" id="mapList">
-          <div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">
-            図面をクリックして予約を追加してください
+      <!-- Floor plan -->
+      <div class="map-col">
+        <div class="card">
+          <div class="ctrl-bar">
+            <button class="btn" id="btnRotL" title="左90°" style="padding:7px 10px;font-size:16px">↺</button>
+            <button class="btn" id="btnRotR" title="右90°" style="padding:7px 10px;font-size:16px">↻</button>
+            <button class="btn btn-primary" id="btnSaveImg" style="padding:7px 13px">💾 画像保存</button>
+            <span style="font-size:12px;color:var(--muted);margin-left:auto">図面をクリック → 搬入追加</span>
+          </div>
+          <div style="padding:10px 12px">
+            <div class="stage-wrap" id="stageWrap">
+              <canvas id="bg"></canvas>
+              <svg id="overlay"></svg>
+              <button class="fs-btn" id="btnFs">⛶ 全画面</button>
+              <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリック</div>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- Timeline -->
+      <div class="tl-col">
+        <div class="card" style="position:sticky;top:100px">
+          <div class="tl-header">
+            <h3>📅 搬入スケジュール</h3>
+            <span class="tl-cnt" id="tlCnt">0件</span>
+          </div>
+          <div class="pin-banner" id="pinBanner">📍 ピン追加モード — 図面をクリックしてピンを追加 <span style="margin-left:auto;font-size:11px;opacity:.8">タップでキャンセル</span></div>
+          <div class="tl-list" id="tlList">
+            <div class="tl-empty">この階の搬入はありません<br><small>図面をクリックして追加</small></div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -238,37 +263,26 @@
   <div class="tab-pane" id="tab-list">
     <div class="card">
       <div class="card-hdr">
-        <h2>📋 予約一覧</h2>
-        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" id="btnCsv">📤 CSV出力</button>
+        <h2>📋 搬入一覧（全階）</h2>
+        <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn" id="btnCsv">📤 CSV</button>
           <button class="btn" id="btnPrint">🖨 印刷</button>
         </div>
       </div>
       <div class="card-body">
-        <!-- filters -->
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
-          <div class="field"><label>業者名</label><select id="fltVendorList" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option></select></div>
-          <div class="field"><label>ステータス</label><select id="fltStatus" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option><option>予約中</option><option>完了</option><option>キャンセル</option></select></div>
-          <div class="field"><label>日付（から）</label><input type="date" id="fltFrom" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" /></div>
-          <div class="field"><label>日付（まで）</label><input type="date" id="fltTo" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" /></div>
-          <div class="field"><label>フロア/ページ</label><select id="fltPage" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option></select></div>
-          <button class="btn" id="btnClearFlt" style="align-self:flex-end">クリア</button>
-        </div>
-        <!-- stats -->
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px">
           <div class="stat-box"><div class="stat-num" id="sTotal" style="color:var(--brand)">0</div><div class="stat-lbl">合計</div></div>
-          <div class="stat-box"><div class="stat-num" id="sActive" style="color:#1d4ed8">0</div><div class="stat-lbl">予約中</div></div>
-          <div class="stat-box"><div class="stat-num" id="sDone" style="color:#15803d">0</div><div class="stat-lbl">完了</div></div>
-          <div class="stat-box"><div class="stat-num" id="sCancel" style="color:#b91c1c">0</div><div class="stat-lbl">キャンセル</div></div>
+          <div class="stat-box"><div class="stat-num" id="sOverlap" style="color:var(--warn)">0</div><div class="stat-lbl">時間重複</div></div>
         </div>
-        <!-- table -->
-        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px">
+        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:9px">
           <table class="rtable">
             <thead><tr>
-              <th>No.</th><th>搬入日</th><th>時間</th><th>業者名</th><th>担当者</th>
-              <th>場所・フロア</th><th>品目</th><th>車両</th><th>ステータス</th><th>操作</th>
+              <th>No.</th><th>階</th><th>日付</th><th>開始</th><th>終了</th>
+              <th>品目</th><th>備考</th><th>操作</th>
             </tr></thead>
-            <tbody id="resTbody"><tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">読み込み中…</td></tr></tbody>
+            <tbody id="resTbody">
+              <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted)">読み込み中…</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -280,33 +294,41 @@
 <!-- ════ TOAST ════ -->
 <div class="toast" id="toast"></div>
 
-<!-- ════ RESERVATION FORM MODAL ════ -->
+<!-- ════ FORM MODAL ════ -->
 <div class="modal-bg" id="formModal">
   <div class="modal">
     <div class="modal-hdr">
-      <h3 id="formTitle">📦 搬入予約を追加</h3>
+      <h3 id="formTitle">📦 搬入を追加</h3>
       <button class="modal-close" id="formClose">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="fId" />
-      <input type="hidden" id="fPage" />
       <input type="hidden" id="fMx" /><input type="hidden" id="fMy" />
       <input type="hidden" id="fBdx" /><input type="hidden" id="fBdy" />
       <div class="fgrid">
-        <div class="field full"><label>業者名 <span class="req">*</span></label><input type="text" id="fVendor" placeholder="例：山田建設" /></div>
-        <div class="field"><label>担当者名</label><input type="text" id="fContact" placeholder="例：山田 太郎" /></div>
-        <div class="field"><label>連絡先電話番号</label><input type="tel" id="fPhone" placeholder="例：090-0000-0000" /></div>
-        <div class="field"><label>搬入日 <span class="req">*</span></label><input type="date" id="fDate" /></div>
-        <div class="field"><label>開始時刻</label><input type="time" id="fTs" /></div>
-        <div class="field"><label>終了時刻（予定）</label><input type="time" id="fTe" /></div>
-        <div class="field"><label>フロア / 搬入場所</label><input type="text" id="fFloor" placeholder="例：1F 玄関ホール" /></div>
-        <div class="field"><label>車両種別</label>
-          <select id="fVehicle"><option value="">選択なし</option><option>軽トラック</option><option>2トン車</option><option>4トン車</option><option>10トン車</option><option>クレーン車</option><option>その他</option></select>
+        <div class="field full">
+          <label>階数 <span class="req">*</span></label>
+          <select id="fRound" style="border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:14px;background:#fff;width:100%"></select>
         </div>
-        <div class="field full"><label>搬入品目 <span class="req">*</span></label><textarea id="fItems" placeholder="例：キッチンセット一式、食器棚×2、冷蔵庫×1"></textarea></div>
-        <div class="field full"><label>備考・注意事項</label><textarea id="fNotes" placeholder="例：搬入口は北側のみ使用可、養生シート持参"></textarea></div>
-        <div class="field" id="statusField" style="display:none"><label>ステータス</label>
-          <select id="fStatus"><option>予約中</option><option>完了</option><option>キャンセル</option></select>
+        <div class="field full">
+          <label>日付 <span class="req">*</span></label>
+          <input type="date" id="fDate" />
+        </div>
+        <div class="field">
+          <label>開始時刻</label>
+          <select id="fTs" style="border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:14px;background:#fff;width:100%"></select>
+        </div>
+        <div class="field">
+          <label>終了時刻</label>
+          <select id="fTe" style="border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:14px;background:#fff;width:100%"></select>
+        </div>
+        <div class="field full">
+          <label>品目 <span class="req">*</span></label>
+          <textarea id="fItems" placeholder="例：キッチンセット一式、食器棚×2、冷蔵庫×1"></textarea>
+        </div>
+        <div class="field full">
+          <label>備考</label>
+          <textarea id="fNotes" placeholder="例：午前中希望、養生シート持参"></textarea>
         </div>
       </div>
     </div>
@@ -319,15 +341,15 @@
 
 <!-- ════ DETAIL MODAL ════ -->
 <div class="modal-bg" id="detailModal">
-  <div class="modal" style="max-width:560px">
+  <div class="modal" style="max-width:420px">
     <div class="modal-hdr">
-      <h3>📋 予約詳細</h3>
+      <h3>📋 搬入詳細</h3>
       <button class="modal-close" id="detailClose">✕</button>
     </div>
     <div class="modal-body" id="detailBody"></div>
     <div class="modal-footer">
       <button class="btn" id="detailClose2">閉じる</button>
-      <button class="btn btn-warn" id="detailEdit">✏️ 編集</button>
+      <button class="btn btn-primary" id="detailEdit">✏️ 編集</button>
       <button class="btn btn-danger" id="detailDel">🗑 削除</button>
     </div>
   </div>
@@ -335,50 +357,40 @@
 
 <!-- ════ FULLSCREEN PANEL ════ -->
 <div id="fsPanel">
-  <div style="width:36px;height:4px;background:#475569;border-radius:4px;margin:0 auto 6px;cursor:grab;flex-basis:100%"></div>
+  <div style="width:32px;height:4px;background:#475569;border-radius:4px;margin:0 auto 4px;cursor:grab;flex-basis:100%"></div>
   <div class="fsfield">
     <label>ページ</label>
-    <div style="display:flex;gap:6px;align-items:center">
-      <button class="btn" id="fsBtnPrev" style="padding:6px 10px;background:#1e293b;color:#f1f5f9;border-color:#334155">◀</button>
+    <div style="display:flex;gap:5px;align-items:center">
+      <button class="btn" id="fsBtnPrev" style="padding:5px 9px;background:#1e293b;color:#f1f5f9;border-color:#334155">◀</button>
       <span class="fscount" id="fsPageInfo">-</span>
-      <button class="btn" id="fsBtnNext" style="padding:6px 10px;background:#1e293b;color:#f1f5f9;border-color:#334155">▶</button>
+      <button class="btn" id="fsBtnNext" style="padding:5px 9px;background:#1e293b;color:#f1f5f9;border-color:#334155">▶</button>
     </div>
   </div>
   <div class="sep"></div>
   <div class="fsfield">
     <label>回転</label>
-    <div style="display:flex;gap:6px">
-      <button class="btn" id="fsBtnRotL" style="padding:6px 12px;background:#1e293b;color:#f1f5f9;border-color:#334155;font-size:18px">↺</button>
-      <button class="btn" id="fsBtnRotR" style="padding:6px 12px;background:#1e293b;color:#f1f5f9;border-color:#334155;font-size:18px">↻</button>
+    <div style="display:flex;gap:5px">
+      <button class="btn" id="fsBtnRotL" style="padding:5px 10px;background:#1e293b;color:#f1f5f9;border-color:#334155;font-size:16px">↺</button>
+      <button class="btn" id="fsBtnRotR" style="padding:5px 10px;background:#1e293b;color:#f1f5f9;border-color:#334155;font-size:16px">↻</button>
     </div>
   </div>
   <div class="sep"></div>
   <span class="fscount" id="fsCnt">0件</span>
   <div class="sep"></div>
-  <button class="btn" id="btnExitFs" style="background:#dc2626;color:#fff;border-color:#dc2626;padding:7px 14px">✕ 閉じる</button>
+  <button class="btn" id="btnExitFs" style="background:#dc2626;color:#fff;border-color:#dc2626;padding:6px 13px">✕ 閉じる</button>
 </div>
 
 <script>
 // ══════════════════════════════════════════════════
-//  ★★★  FIREBASE CONFIG  ★★★
-//  https://console.firebase.google.com でプロジェクト作成後
-//  「アプリを追加 > ウェブ」から取得した設定値をここに貼り付けてください
+//  SUPABASE CONFIG  ← あなたのプロジェクト設定を入力
 // ══════════════════════════════════════════════════
-const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyAmuiGdhWPUQyyY_GDUWqujoEVqy7Dhi0c",
-  authDomain:        "hannnyu.firebaseapp.com",
-  projectId:         "hannnyu",
-  storageBucket:     "hannnyu.firebasestorage.app",
-  messagingSenderId: "737350047078",
-  appId:             "1:737350047078:web:22a0807257217393ab64a7"
-};
+const SUPABASE_URL      = "https://qbpbxspppzczdfigwkwz.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_cONI0DJVvC1kRlv95CaiNA_t9Cd8kDF";
 // ══════════════════════════════════════════════════
 
-// ── PDF.js worker ── (必須: これがないと大きいPDFでブラウザが固まる)
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-// ── Utilities ──
 const $ = id => document.getElementById(id);
 const esc = s => String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const svgNS = "http://www.w3.org/2000/svg";
@@ -386,68 +398,226 @@ const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 
 function toast(msg, dur=4000){
   const t=$("toast"); t.textContent=msg; t.style.display="block";
-  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none"},dur);
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display="none",dur);
 }
 
-// ── Firebase / localStorage fallback ──
-let db=null, dbUnsub=null, usingFb=false;
-const IS_CFG = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
-
+// ── Supabase / localStorage ──
+let sb=null, dbUnsub=null, settingsCh=null, usingSupabase=false;
+const IS_CFG = SUPABASE_URL !== "https://YOUR_PROJECT_ID.supabase.co";
 if(IS_CFG){
   try{
-    firebase.initializeApp(FIREBASE_CONFIG);
-    db = firebase.firestore();
-    usingFb = true;
-    setConn(true);
-  }catch(e){ console.error("Firebase init:",e); showCfgWarn(); }
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    usingSupabase = true;
+    $("connDot").className="conn-dot"; $("connLbl").textContent="接続中…";
+  }catch(e){ console.error("Supabase init:",e); showCfgWarn(); }
 }else{ showCfgWarn(); }
 
 function setConn(on){
-  $("connDot").className = "conn-dot " + (on?"on":"off");
-  $("connLbl").textContent = on ? "リアルタイム同期中" : "ローカルモード";
+  $("connDot").className="conn-dot "+(on?"on":"off");
+  $("connLbl").textContent=on?"リアルタイム同期中":"ローカルモード";
 }
 function showCfgWarn(){ $("cfgWarn").style.display="block"; setConn(false); }
 
-const LS_KEY = "delivery_resv_v1";
+const LS_KEY="delivery_resv_v1";
+const LS_ROUNDS_KEY="delivery_rounds_v1";
 function lsLoad(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch{ return []; } }
 function lsSave(a){ localStorage.setItem(LS_KEY,JSON.stringify(a)); }
+function lsLoadRounds(){ try{ return JSON.parse(localStorage.getItem(LS_ROUNDS_KEY)||"null")||["1階","2階","3階"]; }catch{ return ["1階","2階","3階"]; } }
+function lsSaveRounds(a){
+  localStorage.setItem(LS_ROUNDS_KEY,JSON.stringify(a));
+  saveSettings(); // Supabaseにも保存
+}
+
+// ── Settings sync (PDF URL + rounds) ──
+let currentPdfUrl=null;
+
+async function saveSettings(extra={}){
+  if(!usingSupabase||!sb) return;
+  try{
+    const row={id:1, rounds:rounds, updated_at:new Date().toISOString()};
+    if(extra.pdfUrl)  row.pdf_url  = extra.pdfUrl;
+    if(extra.pdfName) row.pdf_name = extra.pdfName;
+    const {error}=await sb.from('app_settings').upsert(row);
+    if(error) throw error;
+  }catch(e){ console.warn("Settings save error:",e); }
+}
+
+async function applySettings(data){
+  if(!data) return;
+  // 階タブの同期
+  const newRounds = Array.isArray(data.rounds) ? data.rounds
+    : (typeof data.rounds==='string' ? JSON.parse(data.rounds) : null);
+  if(newRounds && JSON.stringify(newRounds)!==JSON.stringify(rounds)){
+    rounds=newRounds;
+    localStorage.setItem(LS_ROUNDS_KEY,JSON.stringify(rounds));
+    if(!rounds.includes(curRound)) curRound=rounds[0];
+    renderRoundTabs(); redrawOverlay(); updateTimeline();
+  }
+  // PDFの同期
+  const pdfUrl  = data.pdf_url  || data.pdfUrl  || null;
+  const pdfName = data.pdf_name || data.pdfName || null;
+  if(pdfUrl && pdfUrl!==currentPdfUrl){
+    currentPdfUrl=pdfUrl;
+    const badge=$("pdfShareBadge");
+    badge.textContent="⬇ 図面を読み込み中…"; badge.style.display="inline";
+    try{
+      const resp=await fetch(pdfUrl);
+      const ab=await resp.arrayBuffer();
+      pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
+      pageCount=pdfDoc.numPages; curPage=1;
+      await loadPdfPage(curPage); updatePageInfo();
+      badge.textContent=`☁ ${pdfName||"図面"}`;
+      $("stageHint").style.display="none";
+      toast("共有図面を読み込みました");
+    }catch(err){
+      console.error("PDF fetch error:",err);
+      badge.textContent="⚠ 図面の取得に失敗";
+    }
+  } else if(pdfUrl && pdfUrl===currentPdfUrl){
+    $("pdfShareBadge").textContent=`☁ ${pdfName||"図面"}`;
+    $("pdfShareBadge").style.display="inline";
+  }
+}
+
+function subscribeSettings(){
+  if(!usingSupabase||!sb) return;
+  // 初期取得
+  sb.from('app_settings').select('*').eq('id',1).single()
+    .then(({data,error})=>{ if(!error&&data) applySettings(data); });
+  // リアルタイム更新
+  if(settingsCh){ try{ settingsCh.unsubscribe(); }catch{} }
+  settingsCh=sb.channel('settings-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'app_settings'},
+      ({new:row})=>{ if(row) applySettings(row); })
+    .subscribe();
+}
+
+// PDFをSupabase Storageにアップロード
+async function uploadPdfAndShare(file){
+  if(!usingSupabase||!sb){ toast("Supabaseが設定されていません"); return; }
+  const badge=$("pdfShareBadge");
+  badge.textContent="⬆ アップロード中…"; badge.style.display="inline";
+  try{
+    const {error:upErr}=await sb.storage.from('floorplans')
+      .upload('current.pdf', file, {contentType:'application/pdf', upsert:true});
+    if(upErr) throw upErr;
+    const {data:urlData}=sb.storage.from('floorplans').getPublicUrl('current.pdf');
+    // キャッシュバスター（再アップロード時にブラウザキャッシュを回避）
+    const url=urlData.publicUrl+'?t='+Date.now();
+    currentPdfUrl=url;
+    await saveSettings({pdfUrl:url, pdfName:file.name});
+    badge.textContent=`☁ ${file.name}`;
+    toast("図面をクラウドに共有しました ☁");
+  }catch(err){
+    console.error("Upload error:",err);
+    badge.textContent="⚠ アップロード失敗";
+    toast("アップロードエラー: "+err.message, 8000);
+  }
+}
 
 // ── State ──
 let reservations = [];
 let selId = null;
+let rounds = lsLoadRounds();
+let curRound = rounds[0] || "1階";
 
 // PDF state
-let pdfDoc = null, curPage = 1, pageCount = 0, normalRot = 0;
-let isFs = false, fsRot = 0;
-let pdfLoadSeq = 0; // ページ競合防止用シーケンス番号
+let pdfDoc=null, curPage=1, pageCount=0, normalRot=0;
+let isFs=false, fsRot=0;
+let pdfLoadSeq=0;
 
 // Stage geometry
 let stageW=1, stageH=1;
-let imgRect = { iw:1, ih:1, sc:1, rot:0 };  // normalized coordinate system
+let imgRect={iw:1,ih:1,sc:1,rot:0};
 
-// Bubble size
-const BW = 172, BH = 60;
-
-// Drag state
+const BW=172, BH=75;
 let drag=null, pendingDrag=null;
-const DRAG_THR = 6;
+const DRAG_THR=6;
+let addPinMode=null; // エントリIDをセットするとそのエントリにピン追加モードになる
 
-// ── Stage elements ──
 const bgCanvas=$("bg"), ctx=bgCanvas.getContext("2d");
 const overlay=$("overlay"), stageWrap=$("stageWrap");
 
+// ── Colors ──
+const COLOR_NORMAL="#0ea5e9";
+const COLOR_OVERLAP="#f97316";
+
+// ── Round tabs ──
+const SOGO_TAB="総合";
+function renderRoundTabs(){
+  const container=$("roundTabs");
+  container.innerHTML="";
+  // 総合タブ（削除不可・常に先頭）
+  const sogoBtn=document.createElement("button");
+  sogoBtn.className="rtab-btn"+(curRound===SOGO_TAB?" active":"");
+  sogoBtn.textContent="🗂 総合";
+  sogoBtn.addEventListener("click",()=>{ curRound=SOGO_TAB; clearPinMode(); renderRoundTabs(); redrawOverlay(); updateTimeline(); });
+  container.appendChild(sogoBtn);
+  // 各階タブ
+  rounds.forEach((r,i)=>{
+    const wrap=document.createElement("div");
+    wrap.style.cssText="display:inline-flex;align-items:center";
+    const btn=document.createElement("button");
+    btn.className="rtab-btn"+(r===curRound?" active":"");
+    btn.textContent=r;
+    btn.addEventListener("click",()=>{ curRound=r; clearPinMode(); renderRoundTabs(); redrawOverlay(); updateTimeline(); });
+    wrap.appendChild(btn);
+    if(rounds.length>1){
+      const del=document.createElement("button");
+      del.className="rtab-del";
+      del.title="削除";
+      del.textContent="×";
+      del.addEventListener("click",e=>{ e.stopPropagation(); confirmDelRound(i); });
+      wrap.appendChild(del);
+    }
+    container.appendChild(wrap);
+  });
+}
+
+function confirmDelRound(i){
+  if(!confirm(`「${rounds[i]}」を削除しますか？\nこの階の搬入データは残ります。`)) return;
+  const deleted=rounds[i];
+  rounds.splice(i,1);
+  if(rounds.length===0) rounds=["1階"];
+  if(curRound===deleted) curRound=rounds[0];
+  lsSaveRounds(rounds);
+  renderRoundTabs(); redrawOverlay(); updateTimeline();
+}
+
+$("btnAddRound").addEventListener("click",()=>{
+  const n=rounds.length+1;
+  let name=`${n}階`;
+  while(rounds.includes(name)) name+="′";
+  rounds.push(name);
+  lsSaveRounds(rounds);
+  curRound=name;
+  renderRoundTabs(); redrawOverlay(); updateTimeline();
+});
+
+// ── Time overlap detection ──
+function hasTimeOverlap(r1,r2){
+  if(!r1.timeStart||!r2.timeStart) return false;
+  const s1=r1.timeStart, e1=r1.timeEnd||"23:59";
+  const s2=r2.timeStart, e2=r2.timeEnd||"23:59";
+  return s1<e2 && s2<e1;
+}
+function getOverlapIds(arr){
+  const set=new Set();
+  for(let i=0;i<arr.length;i++){
+    for(let j=i+1;j<arr.length;j++){
+      if(hasTimeOverlap(arr[i],arr[j])){ set.add(arr[i].id); set.add(arr[j].id); }
+    }
+  }
+  return set;
+}
+
 // ── Stage resize ──
 function resizeStage(){
-  const dpr = window.devicePixelRatio||1;
-  let cssW, cssH;
-  if(isFs && (fsRot===90||fsRot===270)){
-    cssW=window.innerHeight; cssH=window.innerWidth;
-  } else if(isFs){
-    cssW=window.innerWidth; cssH=window.innerHeight;
-  } else {
-    const r=stageWrap.getBoundingClientRect();
-    cssW=Math.max(1,Math.round(r.width)); cssH=Math.max(1,Math.round(r.height));
-  }
+  const dpr=window.devicePixelRatio||1;
+  let cssW,cssH;
+  if(isFs&&(fsRot===90||fsRot===270)){ cssW=window.innerHeight; cssH=window.innerWidth; }
+  else if(isFs){ cssW=window.innerWidth; cssH=window.innerHeight; }
+  else{ const r=stageWrap.getBoundingClientRect(); cssW=Math.max(1,Math.round(r.width)); cssH=Math.max(1,Math.round(r.height)); }
   stageW=cssW; stageH=cssH;
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
   bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
@@ -469,130 +639,94 @@ function drawGrid(){
   ctx.fillText("PDFをアップロードしてください",stageW/2,stageH/2);
   imgRect={iw:stageW,ih:stageH,sc:1,rot:0};
 }
-
 function drawImageFit(img){
-  const rot = isFs ? 0 : normalRot;
-  const iw=img.width, ih=img.height, cw=stageW, ch=stageH;
-  const swapped = (rot===90||rot===270);
-  const sc = Math.min(cw/(swapped?ih:iw), ch/(swapped?iw:ih));
-  imgRect = { iw, ih, sc, rot };
-  ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch);
+  const rot=isFs?0:normalRot;
+  const iw=img.width,ih=img.height,cw=stageW,ch=stageH;
+  const swapped=(rot===90||rot===270);
+  const sc=Math.min(cw/(swapped?ih:iw),ch/(swapped?iw:ih));
+  imgRect={iw,ih,sc,rot};
+  ctx.clearRect(0,0,cw,ch); ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch);
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   if(rot===0){
-    const dw=iw*sc, dh=ih*sc;
-    ctx.drawImage(img,0,0,iw,ih,(cw-dw)/2,(ch-dh)/2,dw,dh);
+    const dw=iw*sc,dh=ih*sc; ctx.drawImage(img,0,0,iw,ih,(cw-dw)/2,(ch-dh)/2,dw,dh);
   } else {
     ctx.save(); ctx.translate(cw/2,ch/2); ctx.rotate(rot*Math.PI/180);
     ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
-    ctx.drawImage(img,0,0,iw,ih,-iw*sc/2,-ih*sc/2,iw*sc,ih*sc);
-    ctx.restore();
+    ctx.drawImage(img,0,0,iw,ih,-iw*sc/2,-ih*sc/2,iw*sc,ih*sc); ctx.restore();
   }
 }
 
-// ── Coordinate conversion (same as original system) ──
+// ── Coordinate conversion ──
 function canvasPxToImgRatio(px,py){
   const {iw,ih,sc,rot}=imgRect;
   const cx=px-stageW/2, cy=py-stageH/2;
   const rad=-rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
   const lx=(cx*cos-cy*sin)/sc, ly=(cx*sin+cy*cos)/sc;
-  return { x:lx/iw+0.5, y:ly/ih+0.5 };
+  return {x:lx/iw+0.5, y:ly/ih+0.5};
 }
 function imgRatioToCanvasPx(rx,ry){
-  // imgRect.rot is already 0 in FS (drawImageFit stores rot=0 when isFs=true)
-  // so we always use rot from imgRect directly — no conditional needed
   const {iw,ih,sc,rot}=imgRect;
   const lx=(rx-0.5)*iw, ly=(ry-0.5)*ih;
-  const rad=rot*Math.PI/180;
-  const cos=Math.cos(rad), sin=Math.sin(rad);
-  return { x:(lx*cos-ly*sin)*sc+stageW/2, y:(lx*sin+ly*cos)*sc+stageH/2 };
+  const rad=rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+  return {x:(lx*cos-ly*sin)*sc+stageW/2, y:(lx*sin+ly*cos)*sc+stageH/2};
 }
-// FS coord from pointer event (matches original)
 function svgPtFromEvent(e){
-  const rot = isFs ? fsRot : 0;
-  if(rot===0){
-    const r=overlay.getBoundingClientRect();
-    return { x:(e.clientX-r.left)*(stageW/r.width), y:(e.clientY-r.top)*(stageH/r.height) };
-  }
+  const rot=isFs?fsRot:0;
+  if(rot===0){ const r=overlay.getBoundingClientRect(); return {x:(e.clientX-r.left)*(stageW/r.width), y:(e.clientY-r.top)*(stageH/r.height)}; }
   const cx=window.innerWidth/2, cy=window.innerHeight/2;
   let dx=e.clientX-cx, dy=e.clientY-cy;
   const rad=-rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
-  return { x:dx*cos-dy*sin+stageW/2, y:dx*sin+dy*cos+stageH/2 };
+  return {x:dx*cos-dy*sin+stageW/2, y:dx*sin+dy*cos+stageH/2};
 }
-
-function redrawBg(){
-  if(!pdfDoc||!pdfDoc._curImg){ drawGrid(); return; }
-  drawImageFit(pdfDoc._curImg);
-}
+function redrawBg(){ if(!pdfDoc||!pdfDoc._curImg){ drawGrid(); return; } drawImageFit(pdfDoc._curImg); }
 
 // ── PDF loading ──
-$("pdfInput").addEventListener("change", async e=>{
+$("pdfInput").addEventListener("change",async e=>{
   const file=e.target.files[0]; if(!file) return;
   try{
-    toast("PDFページ画像を生成しています…（図面が大きい場合、数秒かかります）");
+    toast("PDFを読み込んでいます…");
     const ab=await file.arrayBuffer();
-    pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
+    pdfDoc=await pdfjsLib.getDocument({data:new Uint8Array(ab)}).promise;
     pageCount=pdfDoc.numPages; curPage=1;
     await loadPdfPage(curPage);
     updatePageInfo();
-    toast(`PDF読み込み完了（${pageCount}ページ）。図面をクリックして予約を追加できます。`);
+    toast(`PDF読み込み完了（${pageCount}ページ）`);
     $("stageHint").style.display="none";
+    // Supabaseが使えるなら自動共有
+    if(usingSupabase) uploadPdfAndShare(file);
   }catch(err){ toast("PDF読み込みエラー: "+err.message); }
 });
-
 async function loadPdfPage(n){
   if(!pdfDoc) return;
-  // シーケンス番号で競合防止：連打時に古いページが上書きするのを防ぐ
-  const mySeq = ++pdfLoadSeq;
-
+  const mySeq=++pdfLoadSeq;
   const page=await pdfDoc.getPage(n);
-  if(mySeq !== pdfLoadSeq) return; // より新しいリクエストが来ていたら中断
-
-  // 200 DPI rendering — matches original system quality
-  // PDF 1pt = 1/72 inch, so scale = targetDPI / 72
-  const vp1 = page.getViewport({scale:1, rotation:0});
-  const TARGET_DPI = 200;
-  const dpiScale   = TARGET_DPI / 72;
-  const baseMax    = Math.max(vp1.width, vp1.height);
-  const MAX_LONG   = 10000; // cap long edge at 10000px
-  const scale      = clamp(dpiScale, 0.5, MAX_LONG / baseMax);
-  const vp = page.getViewport({scale, rotation:0});
-
+  if(mySeq!==pdfLoadSeq) return;
+  const vp1=page.getViewport({scale:1,rotation:0});
+  const scale=clamp(200/72, 0.5, 10000/Math.max(vp1.width,vp1.height));
+  const vp=page.getViewport({scale,rotation:0});
   const tmp=document.createElement("canvas");
-  tmp.width  = Math.max(1, Math.floor(vp.width));
-  tmp.height = Math.max(1, Math.floor(vp.height));
-  const tmpCtx = tmp.getContext("2d", {alpha:false});
-  tmpCtx.fillStyle="#ffffff";
-  tmpCtx.fillRect(0,0,tmp.width,tmp.height);
-
-  // intent:"print" renders at higher quality (no antialiasing shortcuts)
-  await page.render({canvasContext:tmpCtx, viewport:vp, intent:"print"}).promise;
-  if(mySeq !== pdfLoadSeq) return; // レンダリング中に別ページが要求されていたら破棄
-
+  tmp.width=Math.max(1,Math.floor(vp.width)); tmp.height=Math.max(1,Math.floor(vp.height));
+  const tmpCtx=tmp.getContext("2d",{alpha:false});
+  tmpCtx.fillStyle="#ffffff"; tmpCtx.fillRect(0,0,tmp.width,tmp.height);
+  await page.render({canvasContext:tmpCtx,viewport:vp,intent:"print"}).promise;
+  if(mySeq!==pdfLoadSeq) return;
   const img=new Image(); img.src=tmp.toDataURL("image/png");
   await new Promise(res=>{ img.onload=res; });
-  if(mySeq !== pdfLoadSeq) return; // 画像変換中も確認
-
-  pdfDoc._curImg=img;
-  resizeStage();
+  if(mySeq!==pdfLoadSeq) return;
+  pdfDoc._curImg=img; resizeStage();
 }
-
 function updatePageInfo(){
-  if(!pdfDoc){ $("pageInfo").textContent="PDF未選択"; $("btnPrev").disabled=true; $("btnNext").disabled=true; return; }
-  $("pageInfo").textContent=`${curPage} / ${pageCount} ページ`;
+  if(!pdfDoc){ $("pageInfo").textContent="未選択"; $("btnPrev").disabled=true; $("btnNext").disabled=true; return; }
+  $("pageInfo").textContent=`${curPage}/${pageCount}p`;
   $("btnPrev").disabled=curPage<=1; $("btnNext").disabled=curPage>=pageCount;
   $("fsPageInfo").textContent=`${curPage}/${pageCount}`;
-  $("fsCnt").textContent=`${getPageRes().length}件`;
+  $("fsCnt").textContent=getRoundRes().length+"件";
 }
-
-$("btnPrev").addEventListener("click",async()=>{
-  if(curPage>1){ curPage--; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); }
-});
-$("btnNext").addEventListener("click",async()=>{
-  if(curPage<pageCount){ curPage++; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); }
-});
-$("fsBtnPrev").addEventListener("click",async()=>{ if(curPage>1){ curPage--; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); } });
-$("fsBtnNext").addEventListener("click",async()=>{ if(curPage<pageCount){ curPage++; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); } });
+async function goPage(n){ curPage=n; await loadPdfPage(n); updatePageInfo(); redrawOverlay(); }
+$("btnPrev").addEventListener("click",()=>{ if(curPage>1) goPage(curPage-1); });
+$("btnNext").addEventListener("click",()=>{ if(curPage<pageCount) goPage(curPage+1); });
+$("fsBtnPrev").addEventListener("click",()=>{ if(curPage>1) goPage(curPage-1); });
+$("fsBtnNext").addEventListener("click",()=>{ if(curPage<pageCount) goPage(curPage+1); });
 
 // ── Rotation ──
 $("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; resizeStage(); });
@@ -602,41 +736,53 @@ $("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; applyFsRotCl
 function applyFsRotClass(){
   stageWrap.classList.remove("rot90","rot180","rot270");
   if(fsRot===90) stageWrap.classList.add("rot90");
-  if(fsRot===180) stageWrap.classList.add("rot180");
-  if(fsRot===270) stageWrap.classList.add("rot270");
+  else if(fsRot===180) stageWrap.classList.add("rot180");
+  else if(fsRot===270) stageWrap.classList.add("rot270");
 }
 
 // ── Fullscreen ──
 let panelPos=null, panelDrag=null;
 $("btnFs").addEventListener("click",enterFs);
 $("btnExitFs").addEventListener("click",exitFs);
-window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&isFs){ exitFs(); e.preventDefault(); } });
+window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&isFs){ drag=null; pendingDrag=null; exitFs(); e.preventDefault(); } });
 function enterFs(){
   stageWrap.classList.add("fullscreen"); $("btnFs").textContent="✕ 閉じる";
   isFs=true; fsRot=0; applyFsRotClass();
   $("fsPanel").classList.add("show"); panelPos=null;
-  resizeStage();
-  setTimeout(()=>setPanelDefault(),100);
+  resizeStage(); setTimeout(setPanelDefault,100);
 }
 function exitFs(){
+  drag=null; pendingDrag=null; // ドラッグ中に解除した場合に備えてリセット
   stageWrap.classList.remove("fullscreen","rot90","rot180","rot270");
   $("btnFs").textContent="⛶ 全画面"; isFs=false; fsRot=0;
   $("fsPanel").classList.remove("show"); stageWrap.style.aspectRatio="16/9";
   resizeStage();
+  // 全画面時の大きなピクセルオフセットを通常キャンバスサイズに合わせてクランプし直す
+  getRoundRes().forEach(res=>{
+    const markers=getMarkers(res);
+    if(!markers.length) return;
+    const a0=imgRatioToCanvasPx(markers[0].x,markers[0].y);
+    const rawDx=res.bubbleDx??24, rawDy=res.bubbleDy??-52;
+    const bOffX=(Math.abs(rawDx)<1&&rawDx!==0)?rawDx*imgRect.iw*imgRect.sc:rawDx;
+    const bOffY=(Math.abs(rawDy)<1&&rawDy!==0)?rawDy*imgRect.ih*imgRect.sc:rawDy;
+    res.bubbleDx=clamp(a0.x+bOffX,-(BW*0.4),stageW-(BW*0.6))-a0.x;
+    res.bubbleDy=clamp(a0.y+bOffY,-(BH*0.4),stageH-(BH*0.6))-a0.y;
+  });
+  redrawOverlay();
 }
 function setPanelDefault(){
-  const p=$("fsPanel"); const pw=p.offsetWidth||600, ph=p.offsetHeight||80;
-  const vw=window.innerWidth, vh=window.innerHeight;
-  panelPos={x:Math.round((vw-pw)/2), y:vh-ph-24}; applyPanelPos();
+  const p=$("fsPanel"), pw=p.offsetWidth||600, ph=p.offsetHeight||80;
+  panelPos={x:Math.round((window.innerWidth-pw)/2), y:window.innerHeight-ph-24}; applyPanelPos();
 }
 function applyPanelPos(){
   if(!panelPos) return;
-  const p=$("fsPanel"), pw=p.offsetWidth, ph=p.offsetHeight, vw=window.innerWidth, vh=window.innerHeight;
-  p.style.left=clamp(panelPos.x,0,vw-pw)+"px"; p.style.top=clamp(panelPos.y,0,vh-ph)+"px";
+  const p=$("fsPanel"), pw=p.offsetWidth, ph=p.offsetHeight;
+  p.style.left=clamp(panelPos.x,0,window.innerWidth-pw)+"px";
+  p.style.top=clamp(panelPos.y,0,window.innerHeight-ph)+"px";
   p.style.bottom="auto"; p.style.transform="none";
 }
 $("fsPanel").addEventListener("pointerdown",e=>{
-  if(e.target.tagName==="SELECT"||e.target.tagName==="BUTTON") return;
+  if(e.target.tagName==="BUTTON") return;
   if(!isFs) return; e.stopPropagation();
   const r=$("fsPanel").getBoundingClientRect();
   panelDrag={sx:e.clientX,sy:e.clientY,px:panelPos?panelPos.x:r.left,py:panelPos?panelPos.y:r.top};
@@ -648,24 +794,11 @@ $("fsPanel").addEventListener("pointermove",e=>{
   panelPos={x:panelDrag.px+(e.clientX-panelDrag.sx), y:panelDrag.py+(e.clientY-panelDrag.sy)};
   applyPanelPos(); e.preventDefault();
 });
-$("fsPanel").addEventListener("pointerup",e=>{ 
+$("fsPanel").addEventListener("pointerup",e=>{
   if(panelDrag){ try{ $("fsPanel").releasePointerCapture(e.pointerId); }catch(_){} }
-  panelDrag=null; e.preventDefault(); 
+  panelDrag=null; e.preventDefault();
 });
 window.addEventListener("resize",()=>{ if(isFs){ panelPos=null; setTimeout(setPanelDefault,50); } });
-
-// ── Vendor color map ──
-const VENDOR_COLORS = {
-  "大工":"#dc2626","電気":"#2563eb","設備":"#16a34a","内装":"#7c3aed",
-  "クリーニング":"#0891b2","左官":"#d97706","塗装":"#db2777",
-  "鉄骨":"#475569","その他":"#6b7280"
-};
-function vColor(name){
-  if(VENDOR_COLORS[name]) return VENDOR_COLORS[name];
-  let h=0; for(const c of String(name)) h=((h<<5)-h)+c.charCodeAt(0);
-  const hues=[0,30,60,120,180,210,240,270,300,330];
-  return `hsl(${hues[Math.abs(h)%hues.length]},70%,45%)`;
-}
 
 // ── SVG helper ──
 function mk(tag,attrs={}){
@@ -674,15 +807,25 @@ function mk(tag,attrs={}){
   return el;
 }
 
-// ── Filter current page reservations ──
-function getPageRes(){
-  const vf=$("fltVendorMap").value, df=$("fltDateMap").value;
-  return reservations.filter(r=>{
-    if(r.pdfPage!==curPage) return false;
-    if(vf && r.vendorName!==vf) return false;
-    if(df && r.deliveryDate!==df) return false;
-    return true;
+// ── マーカー配列を取得（旧 markerX/Y との互換）──
+function getMarkers(res){
+  if(res.markers&&res.markers.length>0) return res.markers;
+  if(res.markerX!=null) return [{x:res.markerX,y:res.markerY}];
+  return [];
+}
+
+// ── 現階のエントリを取得（作成日時昇順 → 番号が安定）──
+function getRoundRes(){
+  // 総合タブは全階を表示
+  const arr=curRound===SOGO_TAB
+    ? [...reservations]
+    : reservations.filter(r=>(r.round||rounds[0])===curRound);
+  arr.sort((a,b)=>{
+    const ta=a.createdAt?.seconds??(typeof a.createdAt==='number'?a.createdAt/1000:0);
+    const tb=b.createdAt?.seconds??(typeof b.createdAt==='number'?b.createdAt/1000:0);
+    return ta-tb;
   });
+  return arr;
 }
 
 // ── Overlay rendering ──
@@ -691,297 +834,384 @@ function redrawOverlay(){
   const hit=mk("rect",{x:0,y:0,width:stageW,height:stageH,fill:"transparent","pointer-events":"all"});
   overlay.appendChild(hit);
 
-  const arr=getPageRes();
-  // Default offset in same units as original: canvas px / (imgDim * scale)
-  const DEF_DX = 24  / (imgRect.iw * imgRect.sc);
-  const DEF_DY = -52 / (imgRect.ih * imgRect.sc);
+  const arr=getRoundRes();
+  const overlapIds=getOverlapIds(arr);
+  // FS時はCSS回転しているので番号テキストを反回転させる。通常モードは回転なし
+  const fsRotNow=isFs?fsRot:0;
 
   arr.forEach((res,idx)=>{
-    if(res.markerX==null||res.markerY==null) return;
+    const markers=getMarkers(res);
+    if(!markers.length) return;
+
     const isSel=res.id===selId;
-    const color=vColor(res.vendorName||"その他");
+    const isPinTarget=res.id===addPinMode;
+    const isOv=overlapIds.has(res.id);
+    const color=isPinTarget?"#22c55e":isOv?COLOR_OVERLAP:COLOR_NORMAL;
     const g=mk("g",{"data-id":res.id});
 
-    // Anchor canvas position
-    const a=imgRatioToCanvasPx(res.markerX, res.markerY);
-    const ax=a.x, ay=a.y;
+    // 吹き出し位置：第0ピンからのキャンバスpxオフセット
+    const a0=imgRatioToCanvasPx(markers[0].x,markers[0].y);
+    // 旧形式（絶対値<1の比率値）は自動変換、新形式はpxそのまま
+    const rawDx=res.bubbleDx??24, rawDy=res.bubbleDy??-52;
+    const bOffX=(Math.abs(rawDx)<1&&rawDx!==0)?rawDx*imgRect.iw*imgRect.sc:rawDx;
+    const bOffY=(Math.abs(rawDy)<1&&rawDy!==0)?rawDy*imgRect.ih*imgRect.sc:rawDy;
+    // 全画面解除等でキャンバスサイズが変わってもはみ出さないようクランプ
+    const bx=clamp(a0.x+bOffX,-(BW*0.4),stageW-(BW*0.6));
+    const by=clamp(a0.y+bOffY,-(BH*0.4),stageH-(BH*0.6));
+    const bcx=bx+BW/2, bcy=by+BH/2;
 
-    // Bubble TOP-LEFT: use imgRatioToCanvasPx(anchor + offset) — exactly like the original.
-    // This correctly handles rotation because imgRatioToCanvasPx uses imgRect.rot.
-    const bdx = res.bubbleDx ?? DEF_DX;
-    const bdy = res.bubbleDy ?? DEF_DY;
-    const _b = imgRatioToCanvasPx(res.markerX + bdx, res.markerY + bdy);
-    const bx=_b.x, by=_b.y;          // bubble top-left
-    const bcx=bx+BW/2, bcy=by+BH/2;  // bubble center (for line endpoint)
+    // 各ピンを描画
+    markers.forEach((m,mi)=>{
+      const a=imgRatioToCanvasPx(m.x,m.y);
+      const ax=a.x, ay=a.y;
 
-    // FS mode: CSS rotates stageWrap, so SVG bubble must counter-rotate
-    const rot=isFs?fsRot:0;
+      // ピン→吹き出し中心へ線
+      g.appendChild(mk("line",{x1:ax,y1:ay,x2:bcx,y2:bcy,
+        stroke:color,"stroke-width":1.8,"stroke-opacity":0.75,"stroke-dasharray":"4 2"}));
 
-    // Line anchor→bubble center
-    const line=mk("line",{x1:ax,y1:ay,x2:bcx,y2:bcy,stroke:color,"stroke-width":1.8,"stroke-opacity":0.75,"stroke-dasharray":"4 2"});
-    g.appendChild(line);
+      // アンカー円
+      const anc=mk("circle",{cx:ax,cy:ay,r:9,fill:color,
+        stroke:isSel?"#0ea5e9":"white","stroke-width":isSel?3:2,cursor:"pointer"});
+      anc.setAttribute("data-role","anchor");
+      anc.setAttribute("data-mi",String(mi));
+      g.appendChild(anc);
 
-    // Anchor circle (draggable)
-    const anc=mk("circle",{cx:ax,cy:ay,r:9,fill:color,stroke:isSel?"#0ea5e9":"white","stroke-width":isSel?3:2,cursor:"pointer"});
-    anc.setAttribute("data-role","anchor"); g.appendChild(anc);
+      // 番号テキスト：FS回転時は逆回転して常に正立させる
+      const an=mk("text",{x:ax,y:ay+4.5,"text-anchor":"middle",
+        "font-size":"10","font-weight":"800",fill:"white","pointer-events":"none"});
+      if(fsRotNow!==0) an.setAttribute("transform",`rotate(${-fsRotNow},${ax},${ay})`);
+      an.textContent=String(idx+1);
+      g.appendChild(an);
 
-    // Anchor number label
-    const an=mk("text",{x:ax,y:ay+4.5,"text-anchor":"middle","font-size":"10","font-weight":"800",fill:"white","pointer-events":"none"});
-    an.textContent=idx+1; g.appendChild(an);
+      // 選択中 & 複数ピンある時：右上に削除バッジ
+      if(isSel && markers.length>1){
+        const db=mk("circle",{cx:ax+8,cy:ay-8,r:7,fill:"#ef4444",
+          stroke:"white","stroke-width":1.5,cursor:"pointer"});
+        db.setAttribute("data-role","pin-del");
+        db.setAttribute("data-mi",String(mi));
+        g.appendChild(db);
+        const dx=mk("text",{x:ax+8,y:ay-8+3.5,"text-anchor":"middle",
+          "font-size":"9","font-weight":"900",fill:"white","pointer-events":"none"});
+        dx.textContent="×";
+        g.appendChild(dx);
+      }
+    });
 
-    // Bubble group (draggable, counter-rotated in FS)
-    const bcxRel=BW/2, bcyRel=BH/2;
-    const bubTr = rot===0 ? `translate(${bx},${by})` : `translate(${bx},${by}) rotate(${-rot},${bcxRel},${bcyRel})`;
+    // 吹き出し（FS回転時は逆回転で正立）
+    const bubTr=fsRotNow===0
+      ?`translate(${bx},${by})`
+      :`translate(${bx},${by}) rotate(${-fsRotNow},${BW/2},${BH/2})`;
     const bg2=mk("g",{transform:bubTr,cursor:"pointer"});
     bg2.setAttribute("data-role","bubble");
 
-    // shadow
     bg2.appendChild(mk("rect",{x:2,y:2,width:BW,height:BH,rx:11,fill:"rgba(0,0,0,0.07)"}));
-    // bg
-    bg2.appendChild(mk("rect",{x:0,y:0,width:BW,height:BH,rx:11,fill:"white",stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
-    // color accent
+    bg2.appendChild(mk("rect",{x:0,y:0,width:BW,height:BH,rx:11,fill:"white",
+      stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
     bg2.appendChild(mk("rect",{x:0,y:0,width:5,height:BH,rx:3,fill:color}));
 
-    // vendor name
-    const t1=mk("text",{x:12,y:19,"font-size":"11","font-weight":"800",fill:"#0f172a"});
-    const vt=(res.vendorName||"").length>17?(res.vendorName||"").slice(0,17)+"…":(res.vendorName||"");
-    t1.textContent=`${idx+1}. ${vt}`; bg2.appendChild(t1);
+    const t1=mk("text",{x:12,y:19,"font-size":"10","font-weight":"800",fill:"#0f172a"});
+    const pinCount=markers.length>1?` [${markers.length}]`:"";
+    const it=(res.items||"").length>16?(res.items||"").slice(0,16)+"…":(res.items||"未入力");
+    t1.textContent=`${idx+1}${pinCount}. ${it}`; bg2.appendChild(t1);
 
-    // date
     const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
-    t2.textContent=res.deliveryDate||"日付未設定"; bg2.appendChild(t2);
+    t2.textContent=`${res.round||rounds[0]}  ${res.deliveryDate||"日付未設定"}`; bg2.appendChild(t2);
 
-    // time or items
     const t3=mk("text",{x:12,y:45,"font-size":"10",fill:"#6b7280"});
-    t3.textContent=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
+    t3.textContent=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):"時間未設定";
     bg2.appendChild(t3);
 
-    // status badge
-    const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
-    const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
-    const st=res.status||"予約中";
-    bg2.appendChild(mk("rect",{x:BW-56,y:4,width:52,height:16,rx:8,fill:sb2[st]||"#f1f5f9"}));
-    const st2=mk("text",{x:BW-30,y:15,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:sc2[st]||"#64748b"});
-    st2.textContent=st; bg2.appendChild(st2);
+    const t4=mk("text",{x:12,y:61,"font-size":"9",fill:"#64748b"});
+    const notesTxt=res.notes?(res.notes.length>24?res.notes.slice(0,24)+"…":res.notes):"";
+    t4.textContent=notesTxt?"備考: "+notesTxt:"";
+    bg2.appendChild(t4);
 
+    if(isOv){
+      bg2.appendChild(mk("rect",{x:BW-46,y:4,width:42,height:16,rx:8,fill:"#fff3cd"}));
+      const ovt=mk("text",{x:BW-25,y:15,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:"#856404"});
+      ovt.textContent="時間重複"; bg2.appendChild(ovt);
+    }
     g.appendChild(bg2);
     overlay.appendChild(g);
   });
-  updateFsInfo();
-}
-
-function updateFsInfo(){
-  $("fsCnt").textContent=getPageRes().length+"件";
+  $("fsCnt").textContent=arr.length+"件";
   $("fsPageInfo").textContent=pdfDoc?`${curPage}/${pageCount}`:"-";
 }
 
-// ── Pointer events on overlay ──
+// ── Pointer events ──
 overlay.addEventListener("pointerdown",e=>{
   if(e.button===2) return;
   const groupEl=e.target.closest("g[data-id]");
   const roleEl=e.target.closest("[data-role]");
-
   if(groupEl){
     const id=groupEl.getAttribute("data-id");
-    selId=id; redrawOverlay(); updateMapList();
+    selId=id; redrawOverlay(); updateTimeline();
     if(roleEl){
-      const role=roleEl.getAttribute("data-role");
       const res=reservations.find(r=>r.id===id);
       if(res){
+        const role=roleEl.getAttribute("data-role");
+        // ピン削除バッジをタップ
+        if(role==="pin-del"){
+          const mi=parseInt(roleEl.getAttribute("data-mi")||"0");
+          deletePinFromEntry(id,mi);
+          e.preventDefault(); return;
+        }
         const p=svgPtFromEvent(e);
-        const _a=imgRatioToCanvasPx(res.markerX,res.markerY);
-        // baseDx/baseDy in canvas px — same as original system
-        const DEF_DX2 = 24  / (imgRect.iw * imgRect.sc);
-        const DEF_DY2 = -52 / (imgRect.ih * imgRect.sc);
-        pendingDrag={
-          id, role,
-          startX:p.x, startY:p.y,
-          baseAnchorX:_a.x, baseAnchorY:_a.y,
-          // stored as canvas px: ratio * (iw*sc)
-          baseDx:(res.bubbleDx ?? DEF_DX2) * imgRect.iw * imgRect.sc,
-          baseDy:(res.bubbleDy ?? DEF_DY2) * imgRect.ih * imgRect.sc,
-          pointerId:e.pointerId
-        };
+        if(role==="anchor"){
+          const mi=parseInt(roleEl.getAttribute("data-mi")||"0");
+          const markers=getMarkers(res);
+          const _a=imgRatioToCanvasPx(markers[mi]?.x??0, markers[mi]?.y??0);
+          const rawDx=res.bubbleDx??24, rawDy=res.bubbleDy??-52;
+          const bOffX=(Math.abs(rawDx)<1&&rawDx!==0)?rawDx*imgRect.iw*imgRect.sc:rawDx;
+          const bOffY=(Math.abs(rawDy)<1&&rawDy!==0)?rawDy*imgRect.ih*imgRect.sc:rawDy;
+          pendingDrag={id,role,mi,startX:p.x,startY:p.y,
+            baseAnchorX:_a.x,baseAnchorY:_a.y,
+            baseDx:bOffX,baseDy:bOffY,
+            pointerId:e.pointerId};
+        } else {
+          const markers=getMarkers(res);
+          const a0=markers.length?imgRatioToCanvasPx(markers[0].x,markers[0].y):{x:0,y:0};
+          const rawDx=res.bubbleDx??24, rawDy=res.bubbleDy??-52;
+          const bOffX=(Math.abs(rawDx)<1&&rawDx!==0)?rawDx*imgRect.iw*imgRect.sc:rawDx;
+          const bOffY=(Math.abs(rawDy)<1&&rawDy!==0)?rawDy*imgRect.ih*imgRect.sc:rawDy;
+          // クランプ済みの実際の表示位置からドラッグ開始（FS解除後のはみ出し対策）
+          const clampedDx=clamp(a0.x+bOffX,-(BW*0.4),stageW-(BW*0.6))-a0.x;
+          const clampedDy=clamp(a0.y+bOffY,-(BH*0.4),stageH-(BH*0.6))-a0.y;
+          pendingDrag={id,role,mi:0,startX:p.x,startY:p.y,
+            baseAnchorX:a0.x,baseAnchorY:a0.y,
+            baseDx:clampedDx,baseDy:clampedDy,
+            pointerId:e.pointerId};
+        }
         overlay.setPointerCapture(e.pointerId);
       }
     }
     e.preventDefault();
   } else {
-    // empty area click → new reservation
     const p=svgPtFromEvent(e);
-    openNewForm(p.x,p.y);
+    if(addPinMode){
+      addPinToEntry(addPinMode,p.x,p.y);
+    } else {
+      openNewForm(p.x,p.y);
+    }
     e.preventDefault();
   }
 });
-
 overlay.addEventListener("pointermove",e=>{
   if(pendingDrag&&!drag){
     const p=svgPtFromEvent(e);
-    if(Math.hypot(p.x-pendingDrag.startX,p.y-pendingDrag.startY)>=DRAG_THR){
-      drag=pendingDrag; pendingDrag=null;
-    }
+    if(Math.hypot(p.x-pendingDrag.startX,p.y-pendingDrag.startY)>=DRAG_THR){ drag=pendingDrag; pendingDrag=null; }
   }
   if(!drag) return;
   const res=reservations.find(r=>r.id===drag.id); if(!res) return;
-  const p=svgPtFromEvent(e);
-  const rawDx=p.x-drag.startX, rawDy=p.y-drag.startY;
-
+  const p=svgPtFromEvent(e), rawDx=p.x-drag.startX, rawDy=p.y-drag.startY;
   if(drag.role==="anchor"){
     const np={x:clamp(drag.baseAnchorX+rawDx,0,stageW), y:clamp(drag.baseAnchorY+rawDy,0,stageH)};
     const r=canvasPxToImgRatio(np.x,np.y);
-    res.markerX=clamp(r.x,0,1); res.markerY=clamp(r.y,0,1);
+    const markers=getMarkers(res);
+    markers[drag.mi]={x:clamp(r.x,0,1),y:clamp(r.y,0,1)};
+    res.markers=markers;
+    if(drag.mi===0){ res.markerX=markers[0].x; res.markerY=markers[0].y; }
   } else if(drag.role==="bubble"){
-    const nr=isFs?0:normalRot;
-    let ddx=rawDx, ddy=rawDy;
-    if(nr!==0){ const rad=-nr*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad); ddx=rawDx*cos-rawDy*sin; ddy=rawDx*sin+rawDy*cos; }
-    const isc=imgRect.iw*imgRect.sc, ihc=imgRect.ih*imgRect.sc;
-    res.bubbleDx=clamp(drag.baseDx+ddx,-isc,isc)/isc;
-    res.bubbleDy=clamp(drag.baseDy+ddy,-ihc,ihc)/ihc;
+    // rawDx/rawDy は svgPtFromEvent がすでにキャンバス座標に変換済み（FS回転補正含む）
+    // normalRot はキャンバスの描画回転であり CSS 回転ではないため、ここでは追加補正不要
+    res.bubbleDx=clamp(drag.baseDx+rawDx,-stageW,stageW);
+    res.bubbleDy=clamp(drag.baseDy+rawDy,-stageH,stageH);
   }
-  redrawOverlay();
-  e.preventDefault();
+  redrawOverlay(); e.preventDefault();
 });
-
 overlay.addEventListener("pointerup",async e=>{
   if(pendingDrag){
     try{ overlay.releasePointerCapture(pendingDrag.pointerId); }catch(_){}
-    // tap (no move) → show detail
-    showDetail(pendingDrag.id);
-    pendingDrag=null;
+    showDetail(pendingDrag.id); pendingDrag=null;
   }
   if(drag){
     try{ overlay.releasePointerCapture(drag.pointerId); }catch(_){}
     const res=reservations.find(r=>r.id===drag.id);
-    if(res){ await saveRes(res,false); }
+    if(res) await saveRes(res,false);
     drag=null;
   }
   e.preventDefault();
 });
 
-// ── Map list ──
-function updateMapList(){
-  const ml=$("mapList"), arr=getPageRes();
-  $("mapCnt").textContent=arr.length+"件";
+// ── Add pin to existing entry ──
+async function addPinToEntry(id, canX, canY){
+  const res=reservations.find(r=>r.id===id); if(!res) return;
+  const r=canvasPxToImgRatio(canX,canY);
+  const markers=getMarkers(res);
+  markers.push({x:clamp(r.x,0,1),y:clamp(r.y,0,1)});
+  res.markers=markers;
+  await saveRes(res,false);
+  toast("ピンを追加しました 📍");
+}
+
+// ── Delete individual pin from entry ──
+async function deletePinFromEntry(id, mi){
+  const res=reservations.find(r=>r.id===id); if(!res) return;
+  const markers=getMarkers(res);
+  if(markers.length<=1){ toast("最後のピンは削除できません"); return; }
+  markers.splice(mi,1);
+  res.markers=markers;
+  // 第0ピンが変わった場合はlegacyフィールドも更新
+  res.markerX=markers[0].x; res.markerY=markers[0].y;
+  await saveRes(res,false);
+  toast("ピンを削除しました");
+}
+
+// ── Timeline ──
+function updateTimeline(){
+  // オーバーレイと番号を一致させるため createdAt 順のインデックスマップを先に作る
+  const baseArr=getRoundRes(); // createdAt 昇順 → 図面上の番号と一致
+  const numMap=new Map(baseArr.map((r,i)=>[r.id,i+1]));
+
+  // 表示は日付・時間順にソート
+  const arr=baseArr.slice().sort((a,b)=>{
+    const sd=(a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+    return sd!==0?sd:(a.timeStart||"").localeCompare(b.timeStart||"");
+  });
+  const ovIds=getOverlapIds(arr);
+  const container=$("tlList");
+  $("tlCnt").textContent=arr.length+"件";
   if(arr.length===0){
-    ml.innerHTML=`<div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">${pdfDoc?"このページに予約はありません":"図面をアップロードしてください"}</div>`;
+    container.innerHTML=`<div class="tl-empty">${curRound===SOGO_TAB?"搬入データはありません":"この階の搬入はありません"}<br><small>図面をクリックして追加</small></div>`;
     return;
   }
-  ml.innerHTML="";
-  arr.forEach((res,i)=>{
+  container.innerHTML="";
+  arr.forEach((res)=>{
+    const isOv=ovIds.has(res.id), isSel=res.id===selId;
     const div=document.createElement("div");
-    div.className="mitem"+(res.id===selId?" selected":"");
+    div.className="tl-entry"+(isOv?" overlap":"")+(isSel?" sel":"");
     div.dataset.id=res.id;
+    const isPinTgt=res.id===addPinMode;
+    const pinCount=getMarkers(res).length;
+    if(isPinTgt) div.classList.add("pin-mode");
+    const num=numMap.get(res.id)??"-";
     div.innerHTML=`
-      <div style="min-width:22px;height:22px;border-radius:50%;background:${vColor(res.vendorName||"")};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
-          ${esc(res.vendorName||"未設定")}
-          <span class="badge badge-${esc(res.status||"予約中")}">${esc(res.status||"予約中")}</span>
+      <div class="tl-num">${num}</div>
+      <div class="tl-body">
+        <div class="tl-time">
+          ${esc(res.timeStart||"--:--")} 〜 ${esc(res.timeEnd||"--:--")}
+          ${isOv?'<span class="ov-badge">重複</span>':""}
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(res.deliveryDate||"")} ${esc(res.timeStart||"")}${res.timeEnd?" 〜 "+esc(res.timeEnd):""} 　${esc((res.items||"").slice(0,28))}</div>
+        ${curRound===SOGO_TAB?`<div style="font-size:11px;font-weight:700;color:#0ea5e9;margin-bottom:2px">${esc(res.round||rounds[0])}</div>`:""}
+        <div class="tl-items">${esc(res.items||"-")}</div>
+        ${res.notes?`<div class="tl-notes">${esc(res.notes)}</div>`:""}
+        <div class="tl-date">${esc(res.deliveryDate||"-")}${pinCount>1?` <span style="color:#0ea5e9;font-size:11px">📍×${pinCount}</span>`:""}</div>
       </div>
-      <div style="display:flex;gap:4px">
-        <button class="btn" style="padding:5px 8px;font-size:12px" data-act="edit">✏</button>
-        <button class="btn btn-danger" style="padding:5px 8px;font-size:12px" data-act="del">🗑</button>
-      </div>
-    `;
+      <div class="tl-acts">
+        <button class="btn btn-sm btn-pin${isPinTgt?" active":""}" data-act="pin" title="ピン追加">📍</button>
+        <button class="btn btn-sm" data-act="edit" title="編集">✏</button>
+        <button class="btn btn-sm btn-danger" data-act="del" title="削除">🗑</button>
+      </div>`;
     div.addEventListener("click",e2=>{
       const act=e2.target.closest("[data-act]")?.dataset.act;
+      if(act==="pin"){
+        addPinMode=addPinMode===res.id?null:res.id;
+        const banner=$("pinBanner");
+        if(addPinMode){ banner.classList.add("show"); } else { banner.classList.remove("show"); }
+        if(addPinMode){ selId=res.id; }
+        updateTimeline(); redrawOverlay(); return;
+      }
       if(act==="edit"){ openEditForm(res.id); return; }
       if(act==="del"){ confirmDel(res.id); return; }
-      selId=res.id; redrawOverlay(); updateMapList();
+      selId=res.id; redrawOverlay(); updateTimeline();
     });
-    ml.appendChild(div);
+    container.appendChild(div);
   });
 }
 
-// ── Reservation table ──
+// ── List tab table ──
 function renderTable(){
   const tbody=$("resTbody");
-  let arr=[...reservations];
-  const vf=$("fltVendorList").value, sf=$("fltStatus").value;
-  const df=$("fltFrom").value, dt=$("fltTo").value, pf=$("fltPage").value;
-  if(vf) arr=arr.filter(r=>r.vendorName===vf);
-  if(sf) arr=arr.filter(r=>(r.status||"予約中")===sf);
-  if(df) arr=arr.filter(r=>r.deliveryDate>=df);
-  if(dt) arr=arr.filter(r=>r.deliveryDate<=dt);
-  if(pf) arr=arr.filter(r=>`${r.pdfPage||1}ページ`===pf);
-  arr.sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
-  if(!arr.length){ tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">予約はありません</td></tr>`; return; }
-  tbody.innerHTML=arr.map((r,i)=>`<tr>
-    <td style="font-weight:700;color:var(--muted)">${i+1}</td>
-    <td style="font-weight:700;white-space:nowrap">${esc(r.deliveryDate||"-")}</td>
-    <td style="white-space:nowrap;font-size:12px">${esc(r.timeStart||"-")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}</td>
-    <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
-    <td style="font-size:12px">${esc(r.contactPerson||"-")}<br><span style="color:var(--muted)">${esc(r.phone||"")}</span></td>
-    <td style="font-size:12px">${esc(r.floor||"-")}<br><span style="color:var(--muted);font-size:11px">P.${r.pdfPage||1}</span></td>
-    <td style="font-size:12px;max-width:160px">${esc((r.items||"-").slice(0,50))}</td>
-    <td style="font-size:12px">${esc(r.vehicleType||"-")}</td>
-    <td><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span></td>
-    <td><div style="display:flex;gap:4px">
-      <button class="btn" style="padding:5px 9px;font-size:12px" onclick="openEditForm('${r.id}')">✏</button>
-      <button class="btn btn-danger" style="padding:5px 9px;font-size:12px" onclick="confirmDel('${r.id}')">🗑</button>
+  // 表示順：階タブ順 → 日付 → 開始時刻
+  const tabOrder=[...rounds];
+  const allArr=[...reservations].sort((a,b)=>{
+    const ia=tabOrder.indexOf(a.round||rounds[0]), ib=tabOrder.indexOf(b.round||rounds[0]);
+    if(ia!==ib) return ia-ib;
+    const sd=(a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+    return sd!==0?sd:(a.timeStart||"").localeCompare(b.timeStart||"");
+  });
+  // 図面番号マップ：階ごとに createdAt 昇順で採番（図面と一致）
+  const floorNumMap=new Map();
+  rounds.forEach(rnd=>{
+    const arr=reservations.filter(r=>(r.round||rounds[0])===rnd)
+      .slice().sort((a,b)=>{
+        const ta=a.createdAt?.seconds??(typeof a.createdAt==='number'?a.createdAt/1000:0);
+        const tb=b.createdAt?.seconds??(typeof b.createdAt==='number'?b.createdAt/1000:0);
+        return ta-tb;
+      });
+    arr.forEach((r,i)=>floorNumMap.set(r.id,i+1));
+  });
+  const allOvIds=new Set();
+  rounds.forEach(rnd=>{ getOverlapIds(reservations.filter(r=>(r.round||rounds[0])===rnd)).forEach(id=>allOvIds.add(id)); });
+  if(!allArr.length){ tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted)">データはありません</td></tr>`; return; }
+  tbody.innerHTML=allArr.map(r=>`<tr class="${allOvIds.has(r.id)?"row-ov":""}">
+    <td style="font-weight:700;color:var(--muted)">${floorNumMap.get(r.id)??"-"}</td>
+    <td style="font-weight:700;white-space:nowrap">${esc(r.round||"1階")}</td>
+    <td style="white-space:nowrap">${esc(r.deliveryDate||"-")}</td>
+    <td style="white-space:nowrap">${esc(r.timeStart||"-")}</td>
+    <td style="white-space:nowrap">${esc(r.timeEnd||"-")}</td>
+    <td style="max-width:180px">${esc((r.items||"-").slice(0,50))}</td>
+    <td style="font-size:12px;max-width:140px;color:var(--muted)">${esc((r.notes||"-").slice(0,40))}</td>
+    <td><div style="display:flex;gap:3px">
+      <button class="btn btn-sm" onclick="openEditForm('${r.id}')">✏</button>
+      <button class="btn btn-sm btn-danger" onclick="confirmDel('${r.id}')">🗑</button>
     </div></td>
   </tr>`).join("");
 }
 
-// ── Stats & filters ──
 function updateStats(){
   $("sTotal").textContent=reservations.length;
-  $("sActive").textContent=reservations.filter(r=>(r.status||"予約中")==="予約中").length;
-  $("sDone").textContent=reservations.filter(r=>r.status==="完了").length;
-  $("sCancel").textContent=reservations.filter(r=>r.status==="キャンセル").length;
-}
-function updateVendorSelects(){
-  const vendors=[...new Set(reservations.map(r=>r.vendorName).filter(Boolean))].sort();
-  ["fltVendorMap","fltVendorList"].forEach(id=>{
-    const s=$(id), cur=s.value;
-    s.innerHTML=`<option value="">${id==="fltVendorMap"?"全業者表示":"全て"}</option>`;
-    vendors.forEach(v=>{ const o=document.createElement("option"); o.value=o.textContent=v; s.appendChild(o); });
-    if(cur) s.value=cur;
-  });
-}
-function updatePageFilter(){
-  const pages=[...new Set(reservations.map(r=>`${r.pdfPage||1}ページ`))].sort();
-  const s=$("fltPage"), cur=s.value;
-  s.innerHTML=`<option value="">全て</option>`;
-  pages.forEach(p=>{ const o=document.createElement("option"); o.value=o.textContent=p; s.appendChild(o); });
-  if(cur) s.value=cur;
-}
-function onDataUpdate(){
-  redrawOverlay(); updateMapList(); renderTable(); updateStats(); updateVendorSelects(); updatePageFilter();
+  const allOvIds=new Set();
+  rounds.forEach(rnd=>{ getOverlapIds(reservations.filter(r=>(r.round||rounds[0])===rnd)).forEach(id=>allOvIds.add(id)); });
+  $("sOverlap").textContent=allOvIds.size;
 }
 
-// ── Firebase / LS CRUD ──
+function onDataUpdate(){
+  redrawOverlay(); updateTimeline(); renderTable(); updateStats();
+}
+
+// ── Supabase / LS CRUD ──
+async function fetchAllReservations(){
+  const {data,error}=await sb.from('reservations')
+    .select('id,data,created_at').order('created_at',{ascending:false});
+  if(error){ console.error(error); setConn(false); reservations=lsLoad(); onDataUpdate(); return; }
+  setConn(true);
+  reservations=data.map(r=>({
+    ...r.data, id:r.id,
+    createdAt: r.data.createdAt ?? new Date(r.created_at).getTime()
+  }));
+  onDataUpdate();
+}
 async function loadReservations(){
-  if(usingFb){
-    if(dbUnsub) dbUnsub();
-    dbUnsub=db.collection("reservations").orderBy("createdAt","desc")
-      .onSnapshot(snap=>{
-        reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
-        onDataUpdate();
-      }, err=>{ console.error(err); setConn(false); reservations=lsLoad(); onDataUpdate(); });
+  if(usingSupabase){
+    await fetchAllReservations();
+    // リアルタイム購読
+    if(dbUnsub){ try{ dbUnsub.unsubscribe(); }catch{} }
+    dbUnsub=sb.channel('reservations-changes')
+      .on('postgres_changes',{event:'*',schema:'public',table:'reservations'},
+        ()=>fetchAllReservations())
+      .subscribe();
+    subscribeSettings();
   } else {
     reservations=lsLoad(); onDataUpdate();
   }
 }
 async function saveRes(data,isNew=true){
-  if(usingFb){
+  if(usingSupabase){
     try{
-      // Firestoreドキュメント本体には id を含めない（ドキュメントIDとして管理するため）
-      const {id: _id, ...docData} = data;
       if(isNew){
-        const ref=await db.collection("reservations").add({
-          ...docData,
-          createdAt:firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        const newId=crypto.randomUUID
+          ? crypto.randomUUID()
+          : 'id_'+Date.now()+'_'+Math.random().toString(16).slice(2);
+        data.id=newId; data.createdAt=Date.now();
+        const {error}=await sb.from('reservations').insert({
+          id:newId, data:data,
+          created_at:new Date(data.createdAt).toISOString()
         });
-        data.id=ref.id;
+        if(error) throw error;
       } else {
-        await db.collection("reservations").doc(data.id).set({
-          ...docData,
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-        },{merge:true});
+        const {error}=await sb.from('reservations').update({data:data}).eq('id',data.id);
+        if(error) throw error;
       }
     }catch(e){ console.error(e); toast("保存エラー: "+e.message); }
   } else {
@@ -991,84 +1221,109 @@ async function saveRes(data,isNew=true){
     lsSave(arr); reservations=arr; onDataUpdate();
   }
 }
+function clearPinMode(){
+  addPinMode=null;
+  $("pinBanner").classList.remove("show");
+}
 async function deleteRes(id){
-  if(usingFb){
-    try{ await db.collection("reservations").doc(id).delete(); }catch(e){ toast("削除エラー: "+e.message); }
+  if(selId===id) selId=null;
+  if(addPinMode===id) clearPinMode();
+  if(usingSupabase){
+    try{
+      const {error}=await sb.from('reservations').delete().eq('id',id);
+      if(error) throw error;
+    }catch(e){ toast("削除エラー: "+e.message); }
   } else { const arr=lsLoad().filter(r=>r.id!==id); lsSave(arr); reservations=arr; onDataUpdate(); }
 }
 
 // ── Form modal ──
 let editingId=null, pendingMx=null, pendingMy=null;
 
+// 15分刻みの時刻選択肢を生成（既存の非15分刻み値も選択肢に追加）
+function buildTimeSelect(fieldId, selected){
+  const el=$(fieldId);
+  const opts=['<option value="">--:--</option>'];
+  const slots=[];
+  for(let h=0;h<24;h++) for(let m=0;m<60;m+=15) slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+  // 既存値が15分刻み以外なら選択肢に追加
+  if(selected && !slots.includes(selected)) slots.push(selected);
+  slots.sort();
+  slots.forEach(v=>opts.push(`<option value="${v}"${v===selected?' selected':''}>${v}</option>`));
+  el.innerHTML=opts.join('');
+}
+
+function buildRoundSelect(selected){
+  // 総合タブ時はデフォルトを最初の階にする
+  const def=curRound===SOGO_TAB?rounds[0]:curRound;
+  const sel=selected||def||rounds[0];
+  $("fRound").innerHTML=rounds.map(r=>`<option value="${esc(r)}"${r===sel?" selected":""}>${esc(r)}</option>`).join("");
+}
 function openNewForm(canX,canY){
   editingId=null; pendingMx=canX; pendingMy=canY;
-  $("formTitle").textContent="📦 搬入予約を追加";
-  clearForm(); $("fDate").value=new Date().toISOString().slice(0,10);
-  $("fPage").value=curPage; $("statusField").style.display="none";
+  $("formTitle").textContent="📦 搬入を追加";
+  ["fId","fItems","fNotes"].forEach(id=>$(id).value="");
+  $("fDate").value=new Date().toISOString().slice(0,10);
+  buildRoundSelect();
+  buildTimeSelect("fTs","");
+  buildTimeSelect("fTe","");
   $("formModal").classList.add("open");
+  setTimeout(()=>$("fDate").focus(),100);
 }
 function openEditForm(id){
   const r=reservations.find(x=>x.id===id); if(!r) return;
   editingId=id; pendingMx=null; pendingMy=null;
-  $("formTitle").textContent="✏️ 予約を編集";
+  $("formTitle").textContent="✏️ 搬入を編集";
   $("fId").value=id;
-  $("fVendor").value=r.vendorName||"";
-  $("fContact").value=r.contactPerson||"";
-  $("fPhone").value=r.phone||"";
   $("fDate").value=r.deliveryDate||"";
-  $("fTs").value=r.timeStart||""; $("fTe").value=r.timeEnd||"";
-  $("fFloor").value=r.floor||""; $("fVehicle").value=r.vehicleType||"";
   $("fItems").value=r.items||""; $("fNotes").value=r.notes||"";
-  $("fStatus").value=r.status||"予約中"; $("statusField").style.display="block";
+  buildRoundSelect(r.round||rounds[0]);
+  // 既存時刻が15分刻みでない場合も選択肢に追加して表示
+  buildTimeSelect("fTs", r.timeStart||"");
+  buildTimeSelect("fTe", r.timeEnd||"");
   $("formModal").classList.add("open");
+  setTimeout(()=>$("fDate").focus(),100);
 }
 window.openEditForm=openEditForm;
 
-function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fTs","fTe","fFloor","fItems","fNotes"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
 function closeForm(){ $("formModal").classList.remove("open"); editingId=null; pendingMx=pendingMy=null; }
-
 $("formClose").addEventListener("click",closeForm);
 $("formCancel").addEventListener("click",closeForm);
 $("formModal").addEventListener("click",e=>{ if(e.target===$("formModal"))closeForm(); });
+$("pinBanner").addEventListener("click",()=>{
+  clearPinMode(); updateTimeline(); redrawOverlay();
+});
 
 $("formSave").addEventListener("click",async()=>{
-  const vendorName=$("fVendor").value.trim();
   const deliveryDate=$("fDate").value;
   const items=$("fItems").value.trim();
-  if(!vendorName){ toast("業者名を入力してください"); $("fVendor").focus(); return; }
-  if(!deliveryDate){ toast("搬入日を入力してください"); $("fDate").focus(); return; }
-  if(!items){ toast("搬入品目を入力してください"); $("fItems").focus(); return; }
+  if(!deliveryDate){ toast("日付を入力してください"); $("fDate").focus(); return; }
+  if(!items){ toast("品目を入力してください"); $("fItems").focus(); return; }
 
   const isNew=!editingId;
-  let markerX,markerY,bubbleDx,bubbleDy;
+  let markers=[], markerX, markerY, bubbleDx=24, bubbleDy=-52;
   if(isNew&&pendingMx!=null){
     const r=canvasPxToImgRatio(pendingMx,pendingMy);
     markerX=clamp(r.x,0,1); markerY=clamp(r.y,0,1);
-    // Default offset: 24px right, 52px up — same as original system
-    bubbleDx = 24  / (imgRect.iw * imgRect.sc);
-    bubbleDy = -52 / (imgRect.ih * imgRect.sc);
+    markers=[{x:markerX,y:markerY}];
+    bubbleDx=24; bubbleDy=-52;
   } else if(!isNew){
     const ex=reservations.find(r=>r.id===editingId);
-    markerX=ex?.markerX; markerY=ex?.markerY;
-    const DEF_DX3 = 24  / (imgRect.iw * imgRect.sc);
-    const DEF_DY3 = -52 / (imgRect.ih * imgRect.sc);
-    bubbleDx=ex?.bubbleDx ?? DEF_DX3;
-    bubbleDy=ex?.bubbleDy ?? DEF_DY3;
+    if(ex){
+      markers=ex.markers&&ex.markers.length>0?ex.markers:(ex.markerX!=null?[{x:ex.markerX,y:ex.markerY}]:[]);
+      markerX=ex.markerX; markerY=ex.markerY;
+      const rawDx=ex.bubbleDx??24, rawDy=ex.bubbleDy??-52;
+      bubbleDx=(Math.abs(rawDx)<1&&rawDx!==0)?rawDx*imgRect.iw*imgRect.sc:rawDx;
+      bubbleDy=(Math.abs(rawDy)<1&&rawDy!==0)?rawDy*imgRect.ih*imgRect.sc:rawDy;
+    }
   }
 
-  const data={
-    vendorName, contactPerson:$("fContact").value.trim(), phone:$("fPhone").value.trim(),
-    deliveryDate, timeStart:$("fTs").value, timeEnd:$("fTe").value,
-    floor:$("fFloor").value.trim(), vehicleType:$("fVehicle").value,
-    items, notes:$("fNotes").value.trim(),
-    status:$("fStatus").value||"予約中",
-    pdfPage:parseInt($("fPage").value)||curPage,
-    markerX, markerY, bubbleDx, bubbleDy
-  };
+  const data={deliveryDate, timeStart:$("fTs").value, timeEnd:$("fTe").value,
+    items, notes:$("fNotes").value.trim(), round:$("fRound").value||curRound,
+    markers, markerX, markerY, bubbleDx, bubbleDy};
   if(!isNew) data.id=editingId;
 
   const btn=$("formSave"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span> 保存中…`;
-  try{ await saveRes(data,isNew); closeForm(); toast(isNew?"予約を追加しました ✅":"予約を更新しました ✅"); }
+  try{ await saveRes(data,isNew); closeForm(); toast(isNew?"追加しました ✅":"更新しました ✅"); }
   finally{ btn.disabled=false; btn.innerHTML=`<span>💾 保存</span>`; }
 });
 
@@ -1076,18 +1331,12 @@ $("formSave").addEventListener("click",async()=>{
 function showDetail(id){
   const r=reservations.find(x=>x.id===id); if(!r) return;
   $("detailBody").innerHTML=`
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:14px;line-height:1.6">
-      <span style="color:var(--muted)">業者名</span><strong>${esc(r.vendorName||"-")}</strong>
-      <span style="color:var(--muted)">担当者</span><span>${esc(r.contactPerson||"-")}</span>
-      <span style="color:var(--muted)">電話番号</span><span>${esc(r.phone||"-")}</span>
-      <span style="color:var(--muted)">搬入日</span><strong>${esc(r.deliveryDate||"-")}</strong>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:14px;line-height:1.6">
+      <span style="color:var(--muted)">階</span><strong>${esc(r.round||"1階")}</strong>
+      <span style="color:var(--muted)">日付</span><strong>${esc(r.deliveryDate||"-")}</strong>
       <span style="color:var(--muted)">時間</span><span>${esc(r.timeStart||"-")} 〜 ${esc(r.timeEnd||"-")}</span>
-      <span style="color:var(--muted)">場所</span><span>${esc(r.floor||"-")}</span>
-      <span style="color:var(--muted)">車両</span><span>${esc(r.vehicleType||"-")}</span>
       <span style="color:var(--muted)">品目</span><span style="white-space:pre-wrap">${esc(r.items||"-")}</span>
       <span style="color:var(--muted)">備考</span><span style="white-space:pre-wrap">${esc(r.notes||"-")}</span>
-      <span style="color:var(--muted)">ページ</span><span>${r.pdfPage||1}ページ目</span>
-      <span style="color:var(--muted)">ステータス</span><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span>
     </div>`;
   $("detailEdit").onclick=()=>{ closeDetail(); openEditForm(id); };
   $("detailDel").onclick=()=>{ closeDetail(); confirmDel(id); };
@@ -1101,11 +1350,11 @@ $("detailModal").addEventListener("click",e=>{ if(e.target===$("detailModal"))cl
 // ── Delete ──
 window.confirmDel=function(id){
   const r=reservations.find(x=>x.id===id); if(!r) return;
-  if(confirm(`「${r.vendorName}」の予約 (${r.deliveryDate}) を削除しますか？`))
+  if(confirm(`この搬入データを削除しますか？\n${r.deliveryDate||""} ${r.timeStart||""} ${(r.items||"").slice(0,30)}`))
     deleteRes(id).then(()=>toast("削除しました"));
 };
 
-// ── Tabs ──
+// ── Main tabs ──
 document.querySelectorAll(".tab-btn").forEach(btn=>{
   btn.addEventListener("click",()=>{
     document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
@@ -1116,163 +1365,142 @@ document.querySelectorAll(".tab-btn").forEach(btn=>{
   });
 });
 
-// ── Filter events ──
-["fltVendorMap","fltDateMap"].forEach(id=>$(id).addEventListener("change",()=>{ redrawOverlay(); updateMapList(); }));
-["fltVendorList","fltStatus","fltFrom","fltTo","fltPage"].forEach(id=>$(id).addEventListener("change",renderTable));
-$("btnClearFlt").addEventListener("click",()=>{
-  ["fltVendorList","fltStatus","fltFrom","fltTo","fltPage"].forEach(id=>$(id).value="");
-  renderTable();
-});
-
 // ── CSV export ──
 $("btnCsv").addEventListener("click",()=>{
-  const headers=["No.","搬入日","開始","終了","業者名","担当者","電話","フロア","品目","車両","ステータス","備考"];
-  const rows=reservations.map((r,i)=>[i+1,r.deliveryDate||"",r.timeStart||"",r.timeEnd||"",r.vendorName||"",r.contactPerson||"",r.phone||"",r.floor||"",r.items||"",r.vehicleType||"",r.status||"予約中",r.notes||""]);
+  const headers=["No.","階","日付","開始","終了","品目","備考"];
+  const allOvIds=new Set();
+  rounds.forEach(rnd=>{ getOverlapIds(reservations.filter(r=>(r.round||rounds[0])===rnd)).forEach(id=>allOvIds.add(id)); });
+  const arr=[...reservations].sort((a,b)=>{
+    const sr=(a.round||"").localeCompare(b.round||"");
+    if(sr!==0) return sr;
+    const sd=(a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+    return sd!==0?sd:(a.timeStart||"").localeCompare(b.timeStart||"");
+  });
+  const rows=arr.map((r,i)=>[i+1,r.round||"1階",r.deliveryDate||"",r.timeStart||"",r.timeEnd||"",r.items||"",r.notes||""]);
   const csv=[headers,...rows].map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));
-  a.download=`搬入予約_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download=`搬入一覧_${new Date().toISOString().slice(0,10)}.csv`;
   a.click(); toast("CSVをダウンロードしました");
 });
 $("btnPrint").addEventListener("click",()=>window.print());
 
-// ── PNG Export (図面 + マーカー + 吹き出し合成) ──
+// ── PNG export ──
 async function saveImage(){
-  const btn=$("btnSaveImg");
-  btn.disabled=true; btn.textContent="⏳ 生成中…";
+  const btn=$("btnSaveImg"); btn.disabled=true; btn.textContent="⏳ 生成中…";
   try{
-    const scale=2; // 高解像度出力（2倍）
+    const scale=2;
     const out=document.createElement("canvas");
     out.width=stageW*scale; out.height=stageH*scale;
     const octx=out.getContext("2d");
-
-    // ── 背景（PDF or グリッド）を描画 ──
     octx.fillStyle="#ffffff"; octx.fillRect(0,0,out.width,out.height);
     octx.drawImage(bgCanvas,0,0,out.width,out.height);
 
-    // ── マーカー・吹き出しをCanvas 2D APIで直接描画 ──
-    const arr=getPageRes();
-    const DEF_DX=24/(imgRect.iw*imgRect.sc);
-    const DEF_DY=-52/(imgRect.ih*imgRect.sc);
+    const arr=getRoundRes();
+    const ovIds=getOverlapIds(arr);
 
     arr.forEach((res,idx)=>{
-      if(res.markerX==null||res.markerY==null) return;
-      const color=vColor(res.vendorName||"その他");
-      const isSel=res.id===selId;
+      const markers=getMarkers(res);
+      if(!markers.length) return;
+      const isOv=ovIds.has(res.id), isSel=res.id===selId;
+      const color=isOv?COLOR_OVERLAP:COLOR_NORMAL;
 
-      // アンカー位置
-      const _a=imgRatioToCanvasPx(res.markerX,res.markerY);
-      const ax=_a.x*scale, ay=_a.y*scale;
+      // Bubble canvas position (pixel offset from first anchor)
+      const a0=imgRatioToCanvasPx(markers[0].x,markers[0].y);
+      const rawDx=res.bubbleDx??24, rawDy=res.bubbleDy??-52;
+      const bOffX=(Math.abs(rawDx)<1&&rawDx!==0)?rawDx*imgRect.iw*imgRect.sc:rawDx;
+      const bOffY=(Math.abs(rawDy)<1&&rawDy!==0)?rawDy*imgRect.ih*imgRect.sc:rawDy;
+      // キャンバス範囲内にクランプしてからscaleをかける
+      const bx=clamp(a0.x+bOffX,-(BW*0.4),stageW-(BW*0.6))*scale;
+      const by=clamp(a0.y+bOffY,-(BH*0.4),stageH-(BH*0.6))*scale;
+      const bw=BW*scale, bh=BH*scale, bcx=bx+bw/2, bcy=by+bh/2;
 
-      // 吹き出し位置（top-left）
-      const bdx=res.bubbleDx??DEF_DX, bdy=res.bubbleDy??DEF_DY;
-      const _b=imgRatioToCanvasPx(res.markerX+bdx,res.markerY+bdy);
-      const bx=_b.x*scale, by=_b.y*scale;
-      const bw=BW*scale, bh=BH*scale;
-      const bcx=bx+bw/2, bcy=by+bh/2;
+      // Draw each anchor pin + line to bubble
+      markers.forEach(m=>{
+        const _a=imgRatioToCanvasPx(m.x,m.y);
+        const ax=_a.x*scale, ay=_a.y*scale;
+        octx.beginPath(); octx.moveTo(ax,ay); octx.lineTo(bcx,bcy);
+        octx.strokeStyle=color; octx.lineWidth=1.8*scale; octx.globalAlpha=0.75;
+        octx.setLineDash([4*scale,2*scale]); octx.stroke(); octx.setLineDash([]); octx.globalAlpha=1;
+        octx.beginPath(); octx.arc(ax,ay,9*scale,0,Math.PI*2);
+        octx.fillStyle=color; octx.fill();
+        octx.strokeStyle=isSel?"#0ea5e9":"white"; octx.lineWidth=isSel?3*scale:2*scale; octx.stroke();
+        octx.fillStyle="#fff"; octx.textAlign="center"; octx.textBaseline="middle";
+        octx.font=`bold ${10*scale}px system-ui,sans-serif`;
+        octx.fillText(String(idx+1),ax,ay);
+      });
 
-      // 線（アンカー→吹き出し中心）
-      octx.beginPath(); octx.moveTo(ax,ay); octx.lineTo(bcx,bcy);
-      octx.strokeStyle=color; octx.lineWidth=1.8*scale;
-      octx.globalAlpha=0.75; octx.setLineDash([4*scale,2*scale]);
-      octx.stroke(); octx.setLineDash([]); octx.globalAlpha=1;
+      // Draw bubble
+      octx.fillStyle="rgba(0,0,0,0.07)"; roundRect(octx,bx+2*scale,by+2*scale,bw,bh,11*scale); octx.fill();
+      octx.fillStyle="#fff"; roundRect(octx,bx,by,bw,bh,11*scale); octx.fill();
+      octx.strokeStyle=isSel?"#0ea5e9":color; octx.lineWidth=isSel?2.5*scale:1.5*scale; octx.stroke();
+      octx.fillStyle=color; roundRect(octx,bx,by,5*scale,bh,3*scale); octx.fill();
 
-      // アンカー円
-      octx.beginPath(); octx.arc(ax,ay,9*scale,0,Math.PI*2);
-      octx.fillStyle=color; octx.fill();
-      octx.strokeStyle=isSel?"#0ea5e9":"white"; octx.lineWidth=isSel?3*scale:2*scale;
-      octx.stroke();
+      // Multi-pin badge
+      if(markers.length>1){
+        const bR=8*scale;
+        octx.beginPath(); octx.arc(bx+bw-bR,by+bR,bR,0,Math.PI*2);
+        octx.fillStyle="#0ea5e9"; octx.fill();
+        octx.fillStyle="#fff"; octx.textAlign="center"; octx.textBaseline="middle";
+        octx.font=`bold ${8*scale}px system-ui,sans-serif`;
+        octx.fillText(String(markers.length),bx+bw-bR,by+bR);
+      }
 
-      // アンカー番号
-      octx.fillStyle="#ffffff"; octx.textAlign="center"; octx.textBaseline="middle";
-      octx.font=`bold ${10*scale}px system-ui,sans-serif`;
-      octx.fillText(String(idx+1),ax,ay);
-
-      // 吹き出し影
-      octx.fillStyle="rgba(0,0,0,0.07)";
-      roundRect(octx,bx+2*scale,by+2*scale,bw,bh,11*scale);
-      octx.fill();
-
-      // 吹き出し背景
-      octx.fillStyle="#ffffff";
-      roundRect(octx,bx,by,bw,bh,11*scale);
-      octx.fill();
-      octx.strokeStyle=isSel?"#0ea5e9":color; octx.lineWidth=isSel?2.5*scale:1.5*scale;
-      octx.stroke();
-
-      // 左アクセントバー
-      octx.fillStyle=color;
-      roundRect(octx,bx,by,5*scale,bh,3*scale);
-      octx.fill();
-
-      // ステータスバッジ
-      const st=res.status||"予約中";
-      const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
-      const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
-      octx.fillStyle=sb2[st]||"#f1f5f9";
-      roundRect(octx,bx+(BW-56)*scale,by+4*scale,52*scale,16*scale,8*scale);
-      octx.fill();
-      octx.fillStyle=sc2[st]||"#64748b"; octx.textAlign="center"; octx.textBaseline="middle";
-      octx.font=`bold ${9*scale}px system-ui,sans-serif`;
-      octx.fillText(st,bx+(BW-30)*scale,by+12*scale);
-
-      // 業者名
       octx.fillStyle="#0f172a"; octx.textAlign="left"; octx.textBaseline="alphabetic";
-      octx.font=`bold ${11*scale}px system-ui,sans-serif`;
-      const vt=(res.vendorName||"").length>17?(res.vendorName||"").slice(0,17)+"…":(res.vendorName||"");
-      octx.fillText(`${idx+1}. ${vt}`,bx+12*scale,by+19*scale);
+      octx.font=`bold ${10*scale}px system-ui,sans-serif`;
+      const it=(res.items||"").length>19?(res.items||"").slice(0,19)+"…":(res.items||"未入力");
+      octx.fillText(`${idx+1}. ${it}`,bx+12*scale,by+19*scale);
 
-      // 搬入日
       octx.fillStyle="#374151"; octx.font=`${10*scale}px system-ui,sans-serif`;
-      octx.fillText(res.deliveryDate||"日付未設定",bx+12*scale,by+32*scale);
+      octx.fillText(`${res.round||rounds[0]}  ${res.deliveryDate||"日付未設定"}`,bx+12*scale,by+32*scale);
 
-      // 時間 or 品目
       octx.fillStyle="#6b7280";
-      const t3txt=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
-      octx.fillText(t3txt,bx+12*scale,by+45*scale);
+      octx.fillText(res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):"時間未設定",bx+12*scale,by+45*scale);
+
+      if(res.notes){
+        const notesTxt=res.notes.length>24?res.notes.slice(0,24)+"…":res.notes;
+        octx.fillStyle="#64748b"; octx.font=`${9*scale}px system-ui,sans-serif`;
+        octx.fillText("備考: "+notesTxt,bx+12*scale,by+61*scale);
+      }
+
+      if(isOv){
+        octx.fillStyle="#fff3cd"; roundRect(octx,bx+(BW-46)*scale,by+4*scale,42*scale,16*scale,8*scale); octx.fill();
+        octx.fillStyle="#856404"; octx.textAlign="center"; octx.textBaseline="middle";
+        octx.font=`bold ${8*scale}px system-ui,sans-serif`;
+        octx.fillText("時間重複",bx+(BW-25)*scale,by+12*scale);
+      }
     });
 
-    // ── 透かし（ページ情報）── 
-    const pageLabel=pdfDoc?`P.${curPage}/${pageCount}`:"";
-    const dateLabel=new Date().toLocaleDateString("ja-JP");
+    const dt=new Date().toLocaleDateString("ja-JP");
     octx.fillStyle="rgba(100,116,139,0.6)"; octx.textAlign="right"; octx.textBaseline="bottom";
     octx.font=`${11*scale}px system-ui,sans-serif`;
-    octx.fillText(`搬入予約図面 ${pageLabel}　${dateLabel}`,out.width-8*scale,out.height-6*scale);
+    octx.fillText(`搬入図面 ${curRound}${pdfDoc?" P."+curPage+"/"+pageCount:""} ${dt}`,out.width-8*scale,out.height-6*scale);
 
-    // ── ダウンロード ──
     out.toBlob(blob=>{
       if(!blob){ toast("画像生成に失敗しました"); return; }
       const a=document.createElement("a");
-      const pg=pdfDoc?`_P${curPage}`:"";
-      const dt=new Date().toISOString().slice(0,10);
-      a.download=`搬入予約図面${pg}_${dt}.png`;
-      a.href=URL.createObjectURL(blob);
-      a.click();
+      a.download=`搬入図面_${curRound}${pdfDoc?"_P"+curPage:""}_${new Date().toISOString().slice(0,10)}.png`;
+      a.href=URL.createObjectURL(blob); a.click();
       setTimeout(()=>URL.revokeObjectURL(a.href),1000);
       toast("画像を保存しました 📷");
     },"image/png");
-
   }catch(e){ console.error(e); toast("保存エラー: "+e.message); }
   finally{ btn.disabled=false; btn.textContent="💾 画像保存"; }
 }
-
-// 角丸矩形ヘルパー
 function roundRect(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
+  ctx.beginPath(); ctx.moveTo(x+r,y);
   ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
   ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
   ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
-  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
-  ctx.closePath();
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
 }
-
 $("btnSaveImg").addEventListener("click",saveImage);
 
 // ── Boot ──
+renderRoundTabs();
 loadReservations();
 resizeStage();
-toast("搬入予約システムへようこそ。PDFをアップロードして予約を開始してください。", 5000);
+toast("搬入管理システムへようこそ。PDFをアップロードして図面上をクリックで追加できます。",5000);
 </script>
 
 </body>
