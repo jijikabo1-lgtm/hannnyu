@@ -427,6 +427,9 @@ function lsSaveRounds(a){
   localStorage.setItem(LS_ROUNDS_KEY,JSON.stringify(a));
   saveSettings(); // Supabaseにも保存
 }
+const LS_ROT_KEY="delivery_rot_v1";
+function lsLoadRot(){ return parseInt(localStorage.getItem(LS_ROT_KEY)||"0",10)||0; }
+function lsSaveRot(r){ localStorage.setItem(LS_ROT_KEY,String(r)); }
 
 // ── Settings sync (PDF URL + rounds) ──
 let currentPdfUrl=null;
@@ -452,6 +455,12 @@ async function applySettings(data){
     localStorage.setItem(LS_ROUNDS_KEY,JSON.stringify(rounds));
     if(!rounds.includes(curRound)) curRound=rounds[0];
     renderRoundTabs(); redrawOverlay(); updateTimeline();
+  }
+  // 回転の同期
+  if(data.pdf_rotation!=null && data.pdf_rotation!==normalRot){
+    normalRot=data.pdf_rotation;
+    lsSaveRot(normalRot);
+    resizeStage();
   }
   // PDFの同期
   const pdfUrl  = data.pdf_url  || data.pdfUrl  || null;
@@ -522,7 +531,7 @@ let rounds = lsLoadRounds();
 let curRound = rounds[0] || "1階";
 
 // PDF state
-let pdfDoc=null, curPage=1, pageCount=0, normalRot=0;
+let pdfDoc=null, curPage=1, pageCount=0, normalRot=lsLoadRot();
 let isFs=false, fsRot=0;
 let pdfLoadSeq=0;
 
@@ -729,8 +738,8 @@ $("fsBtnPrev").addEventListener("click",()=>{ if(curPage>1) goPage(curPage-1); }
 $("fsBtnNext").addEventListener("click",()=>{ if(curPage<pageCount) goPage(curPage+1); });
 
 // ── Rotation ──
-$("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; resizeStage(); });
-$("btnRotR").addEventListener("click",()=>{ normalRot=(normalRot+90)%360; resizeStage(); });
+$("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); resizeStage(); });
+$("btnRotR").addEventListener("click",()=>{ normalRot=(normalRot+90)%360; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); resizeStage(); });
 $("fsBtnRotL").addEventListener("click",()=>{ fsRot=(fsRot-90+360)%360; applyFsRotClass(); resizeStage(); });
 $("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; applyFsRotClass(); resizeStage(); });
 function applyFsRotClass(){
