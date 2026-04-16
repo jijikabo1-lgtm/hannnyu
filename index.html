@@ -1209,10 +1209,16 @@ async function saveRes(data,isNew=true){
           created_at:new Date(data.createdAt).toISOString()
         });
         if(error) throw error;
+        // ローカルに即時反映
+        reservations.unshift(data);
       } else {
         const {error}=await sb.from('reservations').update({data:data}).eq('id',data.id);
         if(error) throw error;
+        // ローカルに即時反映
+        const i=reservations.findIndex(r=>r.id===data.id);
+        if(i>=0) reservations[i]=data; else reservations.unshift(data);
       }
+      onDataUpdate();
     }catch(e){ console.error(e); toast("保存エラー: "+e.message); }
   } else {
     const arr=lsLoad();
@@ -1232,6 +1238,9 @@ async function deleteRes(id){
     try{
       const {error}=await sb.from('reservations').delete().eq('id',id);
       if(error) throw error;
+      // ローカルに即時反映
+      reservations=reservations.filter(r=>r.id!==id);
+      onDataUpdate();
     }catch(e){ toast("削除エラー: "+e.message); }
   } else { const arr=lsLoad().filter(r=>r.id!==id); lsSave(arr); reservations=arr; onDataUpdate(); }
 }
