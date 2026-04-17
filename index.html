@@ -810,8 +810,8 @@ $("fsBtnNext").addEventListener("click",()=>{ if(curPage<pageCount) goPage(curPa
 // ── Rotation ──
 $("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); resizeStage(); });
 $("btnRotR").addEventListener("click",()=>{ normalRot=(normalRot+90)%360; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); resizeStage(); });
-$("fsBtnRotL").addEventListener("click",()=>{ fsRot=(fsRot-90+360)%360; applyFsRotClass(); resizeStage(); });
-$("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; applyFsRotClass(); resizeStage(); });
+$("fsBtnRotL").addEventListener("click",()=>{ fsRot=(fsRot-90+360)%360; normalRot=fsRot; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); applyFsRotClass(); resizeStage(); });
+$("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; normalRot=fsRot; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); applyFsRotClass(); resizeStage(); });
 function applyFsRotClass(){
   stageWrap.classList.remove("rot90","rot180","rot270");
   if(fsRot===90) stageWrap.classList.add("rot90");
@@ -826,14 +826,16 @@ $("btnExitFs").addEventListener("click",exitFs);
 window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&isFs){ drag=null; pendingDrag=null; exitFs(); e.preventDefault(); } });
 function enterFs(){
   stageWrap.classList.add("fullscreen"); $("btnFs").textContent="✕ 閉じる";
-  isFs=true; fsRot=0; applyFsRotClass();
+  isFs=true; fsRot=normalRot; applyFsRotClass(); // normalRotを引き継ぐ
   $("fsPanel").classList.add("show"); panelPos=null;
   resizeStage(); setTimeout(setPanelDefault,100);
 }
 function exitFs(){
   drag=null; pendingDrag=null; // ドラッグ中に解除した場合に備えてリセット
   stageWrap.classList.remove("fullscreen","rot90","rot180","rot270");
-  $("btnFs").textContent="⛶ 全画面"; isFs=false; fsRot=0;
+  $("btnFs").textContent="⛶ 全画面"; isFs=false;
+  normalRot=fsRot; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); // 全画面中の回転を保存
+  fsRot=0;
   $("fsPanel").classList.remove("show"); stageWrap.style.aspectRatio="16/9";
   resizeStage();
   // 全画面時の大きなピクセルオフセットを通常キャンバスサイズに合わせてクランプし直す
