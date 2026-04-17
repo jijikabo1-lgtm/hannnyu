@@ -621,7 +621,7 @@ let pdfLoadSeq=0;
 let stageW=1, stageH=1;
 let imgRect={iw:1,ih:1,sc:1,rot:0};
 
-let BW=172, BH=75;
+let BW=86, BH=38;
 let drag=null, pendingDrag=null;
 let pendingBgTap=null, mobilePanning=false;
 const DRAG_THR=6;
@@ -713,7 +713,7 @@ function resizeStage(){
   stageW=cssW; stageH=cssH;
   // モバイルでは吹き出しを画面サイズに合わせて縮小
   const _bs=Math.min(1,stageW/900);
-  BW=Math.max(90,Math.round(172*_bs)); BH=Math.max(56,Math.round(75*_bs));
+  BW=Math.max(50,Math.round(86*_bs)); BH=Math.max(28,Math.round(38*_bs));
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
   bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
   overlay.style.width=cssW+"px"; overlay.style.height=cssH+"px";
