@@ -172,8 +172,67 @@
 
     /* Print */
     @media print{.hdr,.tabs,.rtabs-bar,.ctrl-bar,.btn,.toast{display:none!important}.rtable{font-size:11px}}
-    /* Mobile */
-    @media(max-width:640px){.wrap{padding:10px 10px}.hdr{padding:0 10px}.tabs{padding:0 10px}.rtabs-bar{padding:0 10px}}
+    /* ── Mobile ── */
+    @media(max-width:640px){
+      /* Header: 2行レイアウト */
+      .hdr{padding:0 10px;gap:6px}
+      .hdr-logo{font-size:14px;padding:10px 0}
+      .hdr-pdf{flex-wrap:wrap;gap:5px;padding:6px 0;width:100%}
+      .hdr-pdf label{font-size:11px}
+      .conn{margin-left:0;font-size:11px;padding:6px 0}
+      #connLbl{display:none}
+      .page-lbl{min-width:55px;font-size:12px}
+      .page-nav button{padding:5px 8px;font-size:12px}
+      /* Tabs */
+      .tabs{padding:0 8px}
+      .tab-btn{padding:9px 14px;font-size:13px}
+      .rtabs-bar{padding:0 8px;top:46px}
+      /* Layout */
+      .wrap{padding:8px}
+      .map-layout{gap:8px}
+      /* Stage: 4:3 on mobile for better portrait view */
+      .stage-wrap{aspect-ratio:4/3}
+      /* Ctrl bar */
+      .ctrl-bar{padding:6px 8px;gap:5px}
+      .ctrl-hint{display:none}
+      /* Buttons: larger tap targets */
+      .btn{padding:10px 13px;min-height:42px;font-size:13px}
+      .btn-sm{padding:8px 10px;min-height:36px;font-size:12px}
+      /* Timeline */
+      .tl-list{max-height:220px}
+      .tl-col{position:relative}
+      /* Toast: bottom center */
+      .toast{left:10px;right:10px;bottom:80px;max-width:none;text-align:center}
+      /* Modal: bottom sheet */
+      .modal-bg{padding:0;align-items:flex-end}
+      .modal{border-radius:18px 18px 0 0;max-height:88vh}
+      /* Table */
+      .rtable{font-size:12px}
+      .rtable th,.rtable td{padding:6px 8px}
+      /* Stats */
+      .stat-box{min-width:70px;padding:9px 10px}
+      .stat-num{font-size:18px}
+      /* fullscreen button: more visible */
+      .fs-btn{font-size:14px;padding:9px 14px}
+    }
+    @media(max-width:400px){
+      .tab-btn{padding:9px 10px;font-size:12px}
+      .hdr-logo{font-size:13px}
+    }
+
+    /* FAB: floating add button (mobile only) */
+    .fab{display:none;position:fixed;bottom:20px;right:16px;z-index:300;width:52px;height:52px;border-radius:50%;background:var(--brand);color:#fff;border:none;font-size:26px;line-height:1;cursor:pointer;box-shadow:0 4px 16px rgba(14,165,233,.5);align-items:center;justify-content:center;transition:transform .15s}
+    .fab:active{transform:scale(.92)}
+    @media(max-width:640px){.fab{display:flex}}
+
+    /* Mobile timeline toggle */
+    .tl-toggle{display:none;width:100%;background:none;border:none;padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;text-align:left;border-top:1px solid var(--border)}
+    @media(max-width:640px){.tl-toggle{display:flex;align-items:center;justify-content:space-between}}
+    .tl-list.collapsed{display:none}
+
+    /* Mobile fullscreen hint banner */
+    .fs-hint-banner{display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:12px;color:#1d4ed8;margin:8px 0 4px;align-items:center;gap:8px}
+    @media(max-width:640px){.fs-hint-banner{display:flex}}
 
     /* cfg warn */
     .cfg-warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;padding:11px 14px;font-size:13px;color:#c2410c;margin-bottom:12px;display:none}
@@ -215,7 +274,7 @@
 <!-- ════ WRAP ════ -->
 <div class="wrap">
   <div class="cfg-warn" id="cfgWarn">
-    ⚠️ <strong>Firebase 未設定</strong> — ローカルモードで動作中（他端末と共有されません）。
+    ⚠️ <strong>Supabase 未設定</strong> — ローカルモードで動作中（他端末と共有されません）。
   </div>
 
   <!-- ── MAP TAB ── -->
@@ -229,7 +288,11 @@
             <button class="btn" id="btnRotL" title="左90°" style="padding:7px 10px;font-size:16px">↺</button>
             <button class="btn" id="btnRotR" title="右90°" style="padding:7px 10px;font-size:16px">↻</button>
             <button class="btn btn-primary" id="btnSaveImg" style="padding:7px 13px">💾 画像保存</button>
-            <span style="font-size:12px;color:var(--muted);margin-left:auto">図面をクリック → 搬入追加</span>
+            <span class="ctrl-hint" style="font-size:12px;color:var(--muted);margin-left:auto">図面をクリック → 搬入追加</span>
+          </div>
+          <div class="fs-hint-banner">
+            📱 スマホでは <strong>全画面モード</strong> が使いやすいです &nbsp;
+            <button class="btn btn-primary btn-sm" onclick="enterFs()" style="margin-left:auto">⛶ 全画面</button>
           </div>
           <div style="padding:10px 12px">
             <div class="stage-wrap" id="stageWrap">
@@ -249,6 +312,10 @@
             <h3>📅 搬入スケジュール</h3>
             <span class="tl-cnt" id="tlCnt">0件</span>
           </div>
+          <button class="tl-toggle" id="tlToggle">
+            <span>スケジュール一覧</span>
+            <span id="tlToggleIcon">▲</span>
+          </button>
           <div class="pin-banner" id="pinBanner">📍 ピン追加モード — 図面をクリックしてピンを追加 <span style="margin-left:auto;font-size:11px;opacity:.8">タップでキャンセル</span></div>
           <div class="tl-list" id="tlList">
             <div class="tl-empty">この階の搬入はありません<br><small>図面をクリックして追加</small></div>
@@ -290,6 +357,9 @@
   </div>
 
 </div><!-- /wrap -->
+
+<!-- ════ FAB (mobile) ════ -->
+<button class="fab" id="fabAdd" title="搬入を追加">＋</button>
 
 <!-- ════ TOAST ════ -->
 <div class="toast" id="toast"></div>
@@ -1513,6 +1583,19 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
 }
 $("btnSaveImg").addEventListener("click",saveImage);
+
+// ── FAB (mobile floating add button) ──
+$("fabAdd").addEventListener("click",()=>{
+  openNewForm(null, null);
+});
+
+// ── Timeline toggle (mobile) ──
+let tlCollapsed = false;
+$("tlToggle").addEventListener("click",()=>{
+  tlCollapsed = !tlCollapsed;
+  $("tlList").classList.toggle("collapsed", tlCollapsed);
+  $("tlToggleIcon").textContent = tlCollapsed ? "▼" : "▲";
+});
 
 // ── Boot ──
 renderRoundTabs();
