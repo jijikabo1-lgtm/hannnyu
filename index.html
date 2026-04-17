@@ -93,6 +93,7 @@
 
     /* ── Stage ── */
     .stage-wrap{position:relative;background:#fff;border-radius:10px;border:1px dashed #cbd5e1;overflow:hidden;aspect-ratio:16/9}
+    #stageInner{position:absolute;top:0;left:0;width:100%;height:100%;transform-origin:0 0}
     canvas#bg{position:absolute;top:0;left:0;display:block}
     svg#overlay{position:absolute;top:0;left:0;touch-action:none}
     .fs-btn{position:absolute;top:8px;right:8px;z-index:10;background:rgba(15,23,42,.72);color:#fff;border:none;border-radius:7px;padding:6px 11px;cursor:pointer;font-size:12px;font-weight:600;backdrop-filter:blur(4px)}
@@ -297,8 +298,10 @@
           </div>
           <div style="padding:10px 12px">
             <div class="stage-wrap" id="stageWrap">
-              <canvas id="bg"></canvas>
-              <svg id="overlay"></svg>
+              <div id="stageInner">
+                <canvas id="bg"></canvas>
+                <svg id="overlay"></svg>
+              </div>
               <button class="fs-btn" id="btnFs">⛶ 全画面</button>
               <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリック</div>
             </div>
@@ -610,8 +613,9 @@ let pdfLoadSeq=0;
 let stageW=1, stageH=1;
 let imgRect={iw:1,ih:1,sc:1,rot:0};
 
-const BW=172, BH=75;
+let BW=172, BH=75;
 let drag=null, pendingDrag=null;
+let pendingBgTap=null, mobilePanning=false;
 const DRAG_THR=6;
 let addPinMode=null; // エントリIDをセットするとそのエントリにピン追加モードになる
 
@@ -699,6 +703,9 @@ function resizeStage(){
   else if(isFs){ cssW=window.innerWidth; cssH=window.innerHeight; }
   else{ const r=stageWrap.getBoundingClientRect(); cssW=Math.max(1,Math.round(r.width)); cssH=Math.max(1,Math.round(r.height)); }
   stageW=cssW; stageH=cssH;
+  // モバイルでは吹き出しを画面サイズに合わせて縮小
+  const _bs=Math.min(1,stageW/900);
+  BW=Math.max(90,Math.round(172*_bs)); BH=Math.max(56,Math.round(75*_bs));
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
   bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
   overlay.style.width=cssW+"px"; overlay.style.height=cssH+"px";
@@ -827,12 +834,12 @@ $("btnExitFs").addEventListener("click",exitFs);
 window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&isFs){ drag=null; pendingDrag=null; exitFs(); e.preventDefault(); } });
 function enterFs(){
   stageWrap.classList.add("fullscreen"); $("btnFs").textContent="✕ 閉じる";
-  isFs=true; fsRot=normalRot; applyFsRotClass(); // normalRotを引き継ぐ
+  isFs=true; fsRot=normalRot; applyFsRotClass(); resetVT(); // normalRotを引き継ぐ・VTリセット
   $("fsPanel").classList.add("show"); panelPos=null;
   resizeStage(); setTimeout(setPanelDefault,100);
 }
 function exitFs(){
-  drag=null; pendingDrag=null; // ドラッグ中に解除した場合に備えてリセット
+  drag=null; pendingDrag=null; resetVT(); // ドラッグ中に解除した場合に備えてリセット
   stageWrap.classList.remove("fullscreen","rot90","rot180","rot270");
   $("btnFs").textContent="⛶ 全画面"; isFs=false;
   normalRot=fsRot; lsSaveRot(normalRot); saveSettings({pdf_rotation:normalRot}); // 全画面中の回転を保存
@@ -985,34 +992,36 @@ function redrawOverlay(){
       :`translate(${bx},${by}) rotate(${-fsRotNow},${BW/2},${BH/2})`;
     const bg2=mk("g",{transform:bubTr,cursor:"pointer"});
     bg2.setAttribute("data-role","bubble");
-
-    bg2.appendChild(mk("rect",{x:2,y:2,width:BW,height:BH,rx:11,fill:"rgba(0,0,0,0.07)"}));
-    bg2.appendChild(mk("rect",{x:0,y:0,width:BW,height:BH,rx:11,fill:"white",
+    // 内部SVGでviewBoxスケーリング（テキスト等は常に172×75座標系で記述、BW/BHで表示サイズ制御）
+    const bInner=mk("svg",{x:0,y:0,width:BW,height:BH,viewBox:"0 0 172 75",overflow:"visible"});
+    bInner.appendChild(mk("rect",{x:2,y:2,width:170,height:73,rx:11,fill:"rgba(0,0,0,0.07)"}));
+    bInner.appendChild(mk("rect",{x:0,y:0,width:172,height:75,rx:11,fill:"white",
       stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
-    bg2.appendChild(mk("rect",{x:0,y:0,width:5,height:BH,rx:3,fill:color}));
+    bInner.appendChild(mk("rect",{x:0,y:0,width:5,height:75,rx:3,fill:color}));
 
     const t1=mk("text",{x:12,y:19,"font-size":"10","font-weight":"800",fill:"#0f172a"});
     const pinCount=markers.length>1?` [${markers.length}]`:"";
     const it=(res.items||"").length>16?(res.items||"").slice(0,16)+"…":(res.items||"未入力");
-    t1.textContent=`${idx+1}${pinCount}. ${it}`; bg2.appendChild(t1);
+    t1.textContent=`${idx+1}${pinCount}. ${it}`; bInner.appendChild(t1);
 
     const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
-    t2.textContent=`${res.round||rounds[0]}  ${res.deliveryDate||"日付未設定"}`; bg2.appendChild(t2);
+    t2.textContent=`${res.round||rounds[0]}  ${res.deliveryDate||"日付未設定"}`; bInner.appendChild(t2);
 
     const t3=mk("text",{x:12,y:45,"font-size":"10",fill:"#6b7280"});
     t3.textContent=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):"時間未設定";
-    bg2.appendChild(t3);
+    bInner.appendChild(t3);
 
     const t4=mk("text",{x:12,y:61,"font-size":"9",fill:"#64748b"});
     const notesTxt=res.notes?(res.notes.length>24?res.notes.slice(0,24)+"…":res.notes):"";
     t4.textContent=notesTxt?"備考: "+notesTxt:"";
-    bg2.appendChild(t4);
+    bInner.appendChild(t4);
 
     if(isOv){
-      bg2.appendChild(mk("rect",{x:BW-46,y:4,width:42,height:16,rx:8,fill:"#fff3cd"}));
-      const ovt=mk("text",{x:BW-25,y:15,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:"#856404"});
-      ovt.textContent="時間重複"; bg2.appendChild(ovt);
+      bInner.appendChild(mk("rect",{x:126,y:4,width:42,height:16,rx:8,fill:"#fff3cd"}));
+      const ovt=mk("text",{x:147,y:15,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:"#856404"});
+      ovt.textContent="時間重複"; bInner.appendChild(ovt);
     }
+    bg2.appendChild(bInner);
     g.appendChild(bg2);
     overlay.appendChild(g);
   });
@@ -1072,10 +1081,15 @@ overlay.addEventListener("pointerdown",e=>{
     const p=svgPtFromEvent(e);
     if(addPinMode){
       addPinToEntry(addPinMode,p.x,p.y);
+      e.preventDefault();
+    } else if(e.pointerType==="touch"){
+      // モバイル：パン操作か確認してからフォームを開く
+      pendingBgTap={x:p.x,y:p.y,pointerId:e.pointerId};
+      e.preventDefault();
     } else {
       openNewForm(p.x,p.y);
+      e.preventDefault();
     }
-    e.preventDefault();
   }
 });
 overlay.addEventListener("pointermove",e=>{
@@ -1102,6 +1116,11 @@ overlay.addEventListener("pointermove",e=>{
   redrawOverlay(); e.preventDefault();
 });
 overlay.addEventListener("pointerup",async e=>{
+  // モバイル背景タップ：パンしていなければフォームを開く
+  if(pendingBgTap&&e.pointerId===pendingBgTap.pointerId){
+    if(!mobilePanning) openNewForm(pendingBgTap.x,pendingBgTap.y);
+    pendingBgTap=null; mobilePanning=false;
+  }
   if(pendingDrag){
     try{ overlay.releasePointerCapture(pendingDrag.pointerId); }catch(_){}
     showDetail(pendingDrag.id); pendingDrag=null;
@@ -1586,6 +1605,81 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
 }
 $("btnSaveImg").addEventListener("click",saveImage);
+
+// ── Map Pan / Pinch-Zoom ──
+const stageInner=$("stageInner");
+let vtScale=1,vtTx=0,vtTy=0;
+const VT_MIN=0.5,VT_MAX=4;
+function applyVT(){ stageInner.style.transform=`translate(${vtTx}px,${vtTy}px) scale(${vtScale})`; }
+function resetVT(){ vtScale=1;vtTx=0;vtTy=0;applyVT(); }
+function clampVT(){
+  if(vtScale<=1){ vtTx=0;vtTy=0;return; }
+  const mx=stageW*(vtScale-1),my=stageH*(vtScale-1);
+  vtTx=clamp(vtTx,-mx,0); vtTy=clamp(vtTy,-my,0);
+}
+let _tp1=null,_tp2=null,_tpan=false,_lastTap=0;
+stageWrap.addEventListener('touchstart',e=>{
+  if(isFs) return;
+  if(e.touches.length>=2){
+    e.preventDefault();
+    const a=e.touches[0],b=e.touches[1];
+    _tp1={x:a.clientX,y:a.clientY};
+    _tp2={x:b.clientX,y:b.clientY,
+      dist:Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY),
+      scale:vtScale,tx:vtTx,ty:vtTy,
+      cx:(a.clientX+b.clientX)/2,cy:(a.clientY+b.clientY)/2};
+    _tpan=false; pendingBgTap=null;
+  } else if(e.touches.length===1){
+    const t=e.touches[0];
+    const onEl=document.elementFromPoint(t.clientX,t.clientY);
+    if(onEl&&onEl.closest("g[data-id]")){ _tp1=null; return; }
+    _tp1={x:t.clientX,y:t.clientY,tx:vtTx,ty:vtTy};
+    _tp2=null; _tpan=false;
+    // ダブルタップでズームリセット
+    const now=Date.now();
+    if(now-_lastTap<280){ resetVT(); e.preventDefault(); }
+    _lastTap=now;
+  }
+},{passive:false});
+stageWrap.addEventListener('touchmove',e=>{
+  if(isFs) return;
+  if(e.touches.length>=2&&_tp2){
+    e.preventDefault();
+    const a=e.touches[0],b=e.touches[1];
+    const dist=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);
+    const newScale=clamp(_tp2.scale*(dist/_tp2.dist),VT_MIN,VT_MAX);
+    const rect=stageWrap.getBoundingClientRect();
+    const lcx=_tp2.cx-rect.left,lcy=_tp2.cy-rect.top;
+    vtTx=lcx-(lcx-_tp2.tx)*(newScale/_tp2.scale);
+    vtTy=lcy-(lcy-_tp2.ty)*(newScale/_tp2.scale);
+    const ncx=(a.clientX+b.clientX)/2,ncy=(a.clientY+b.clientY)/2;
+    vtTx+=ncx-_tp2.cx; vtTy+=ncy-_tp2.cy;
+    vtScale=newScale; _tp2.cx=ncx; _tp2.cy=ncy;
+    applyVT();
+  } else if(e.touches.length===1&&_tp1&&!_tp2){
+    const t=e.touches[0];
+    const dx=t.clientX-_tp1.x,dy=t.clientY-_tp1.y;
+    if(!_tpan&&Math.hypot(dx,dy)>8){ _tpan=true; mobilePanning=true; pendingBgTap=null; }
+    if(_tpan){
+      e.preventDefault();
+      vtTx=_tp1.tx+dx; vtTy=_tp1.ty+dy;
+      clampVT(); applyVT();
+    }
+  }
+},{passive:false});
+stageWrap.addEventListener('touchend',e=>{
+  if(isFs) return;
+  if(e.touches.length===0){
+    if(_tpan){ clampVT(); applyVT(); }
+    _tp1=null; _tp2=null; _tpan=false;
+    setTimeout(()=>{ mobilePanning=false; },50);
+  } else if(e.touches.length===1){
+    _tp2=null;
+    const t=e.touches[0];
+    _tp1={x:t.clientX,y:t.clientY,tx:vtTx,ty:vtTy};
+    _tpan=false;
+  }
+},{passive:false});
 
 // ── FAB (mobile floating add button) ──
 $("fabAdd").addEventListener("click",()=>{
