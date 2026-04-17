@@ -621,7 +621,7 @@ let pdfLoadSeq=0;
 let stageW=1, stageH=1;
 let imgRect={iw:1,ih:1,sc:1,rot:0};
 
-let BW=86, BH=38;
+let BW=129, BH=57;
 let drag=null, pendingDrag=null;
 let pendingBgTap=null, mobilePanning=false;
 const DRAG_THR=6;
@@ -713,7 +713,7 @@ function resizeStage(){
   stageW=cssW; stageH=cssH;
   // モバイルでは吹き出しを画面サイズに合わせて縮小
   const _bs=Math.min(1,stageW/900);
-  BW=Math.max(50,Math.round(86*_bs)); BH=Math.max(28,Math.round(38*_bs));
+  BW=Math.max(70,Math.round(129*_bs)); BH=Math.max(40,Math.round(57*_bs));
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
   bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
   overlay.style.width=cssW+"px"; overlay.style.height=cssH+"px";
@@ -1007,19 +1007,19 @@ function redrawOverlay(){
       stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
     bInner.appendChild(mk("rect",{x:0,y:0,width:5,height:75,rx:3,fill:color}));
 
-    const t1=mk("text",{x:12,y:19,"font-size":"10","font-weight":"800",fill:"#0f172a"});
+    const t1=mk("text",{x:12,y:19,"font-size":"13","font-weight":"800",fill:"#0f172a"});
     const pinCount=markers.length>1?` [${markers.length}]`:"";
     const it=(res.items||"").length>16?(res.items||"").slice(0,16)+"…":(res.items||"未入力");
     t1.textContent=`${idx+1}${pinCount}. ${it}`; bInner.appendChild(t1);
 
-    const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
+    const t2=mk("text",{x:12,y:32,"font-size":"12",fill:"#374151"});
     t2.textContent=`${res.round||rounds[0]}  ${res.deliveryDate||"日付未設定"}`; bInner.appendChild(t2);
 
-    const t3=mk("text",{x:12,y:45,"font-size":"10",fill:"#6b7280"});
+    const t3=mk("text",{x:12,y:45,"font-size":"12",fill:"#6b7280"});
     t3.textContent=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):"時間未設定";
     bInner.appendChild(t3);
 
-    const t4=mk("text",{x:12,y:61,"font-size":"9",fill:"#64748b"});
+    const t4=mk("text",{x:12,y:61,"font-size":"11",fill:"#64748b"});
     const notesTxt=res.notes?(res.notes.length>24?res.notes.slice(0,24)+"…":res.notes):"";
     t4.textContent=notesTxt?"備考: "+notesTxt:"";
     bInner.appendChild(t4);
