@@ -216,6 +216,14 @@
     #fsPanel .fsfield{display:flex;flex-direction:column;gap:2px}
     .fscount{font-size:12px;color:#64748b;white-space:nowrap}
 
+    /* ── Site selector ── */
+    .site-sel{display:flex;align-items:center;gap:6px;padding:6px 0}
+    .site-sel select{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:8px;padding:5px 8px;font-size:13px;font-weight:600;max-width:170px;cursor:pointer;height:32px}
+    .site-sel select option{background:#1e293b;color:#fff}
+    .site-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:13px;line-height:1;transition:background .15s;height:32px}
+    .site-btn:hover{background:rgba(255,255,255,.28)}
+    @media(max-width:640px){.site-sel select{max-width:110px;font-size:12px}.site-btn{font-size:12px;padding:4px 7px}}
+
     /* Print */
     @media print{.hdr,.tabs,.card-hdr .btn,.btn,.stage-wrap,.cfg-warn,.toast{display:none!important}.rtable{font-size:11px}.badge{border:1px solid #ccc}}
 
@@ -239,7 +247,12 @@
 
 <!-- ════ HEADER ════ -->
 <header class="hdr">
-  <div class="hdr-logo">🏗 搬入予約システム</div>
+  <div class="hdr-logo">🏗 搬入予約</div>
+  <div class="site-sel">
+    <select id="siteSelect"><option value="">現場を選択…</option></select>
+    <button class="site-btn" id="btnSiteAdd" title="現場を追加">＋</button>
+    <button class="site-btn" id="btnSiteEdit" title="現場名を変更・削除">✏</button>
+  </div>
   <div class="hdr-pdf">
     <label>図面PDF</label>
     <input id="pdfInput" type="file" accept="application/pdf" />
@@ -399,6 +412,27 @@
 
 <!-- ════ TOAST ════ -->
 <div class="toast" id="toast"></div>
+
+<!-- ════ SITE MODAL ════ -->
+<div class="modal-bg" id="siteModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-hdr">
+      <h3 id="siteModalTitle">🏗 現場を追加</h3>
+      <button class="modal-close" id="siteModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>現場名 <span class="req">*</span></label>
+        <input type="text" id="siteName" placeholder="例：〇〇ビル新築工事" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="btnSiteDel" style="margin-right:auto;display:none">🗑 削除</button>
+      <button class="btn" id="siteModalCancel">キャンセル</button>
+      <button class="btn btn-primary" id="siteModalSave">💾 保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- ════ RESERVATION FORM MODAL ════ -->
 <div class="modal-bg" id="formModal">
@@ -572,6 +606,10 @@ function lsSave(a){ localStorage.setItem(LS_KEY,JSON.stringify(a)); }
 
 let reservations = [];
 let selId = null;
+let currentSiteId = null;
+let sites = [];
+let siteUnsub = null;
+let pdfWatchUnsub = null;
 
 let pdfDoc = null, curPage = 1, pageCount = 0, normalRot = 0;
 let isFs = false, fsRot = 0;
@@ -770,12 +808,13 @@ $("pdfInput").addEventListener("change", async e=>{
         await ref.put(new Blob([ab],{type:"application/pdf"}), {
           customMetadata: { fileName: file.name }
         });
-        // 最新PDFの参照情報をFirestoreに保存
-        await db.collection("settings").doc("currentPdf").set({
-          pdfId,
-          fileName: file.name,
-          uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        // 現場ドキュメントにPDF情報を保存
+        if(currentSiteId){
+          await db.collection("sites").doc(currentSiteId).update({
+            pdfId, fileName: file.name,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
       }catch(err){
         console.error("Storage upload failed:",err);
         toast("⚠️ クラウド保存に失敗しました。ローカルのみ表示します。");
@@ -794,47 +833,32 @@ $("pdfInput").addEventListener("change", async e=>{
   }
 });
 
-// 起動時：Firestoreから最新PDF情報を取得して、キャッシュかStorageから読み込み
-async function loadLatestPdf(){
-  if(!usingFb) return;
+// ── 現場のPDFを読み込み ──
+async function loadSitePdf(siteId){
+  if(!usingFb||!siteId) return;
   try{
-    const doc = await db.collection("settings").doc("currentPdf").get();
+    const doc = await db.collection("sites").doc(siteId).get();
     if(!doc.exists) return;
-    const { pdfId, fileName, rotation } = doc.data();
-    if(!pdfId) return;
-    if(rotation != null){ normalRot = rotation; }
-
-    // まずローカルキャッシュをチェック
+    const {pdfId, fileName, rotation} = doc.data();
+    if(rotation!=null){ normalRot=rotation; }
+    if(!pdfId){ resizeStage(); return; }
     const cached = await loadCachedPdf(pdfId);
     let ab;
-    if(cached && cached.data){
-      console.log("PDF loaded from local cache");
-      toast("PDFを読み込み中…（キャッシュから）");
-      ab = cached.data;
+    if(cached&&cached.data){
+      toast("PDFを読み込み中…（キャッシュから）"); ab=cached.data;
     } else {
-      // キャッシュになければStorageからダウンロード
-      console.log("PDF loaded from cloud");
       toast("PDFをクラウドから取得中…");
       const url = await firebase.storage().ref(`pdfs/${pdfId}.pdf`).getDownloadURL();
-      const res = await fetch(url);
-      ab = await res.arrayBuffer();
-      // 次回のためキャッシュに保存
+      const res = await fetch(url); ab=await res.arrayBuffer();
       await cachePdf(pdfId, ab, fileName||"figure.pdf");
     }
-
-    currentPdfId = pdfId;
-    pageImgCache.clear();
-    pdfDoc = await pdfjsLib.getDocument({data:ab.slice(0)}).promise;
-    pageCount = pdfDoc.numPages;
-    curPage = 1;
-    await loadPdfPage(curPage);
-    updatePageInfo();
+    currentPdfId=pdfId; pageImgCache.clear();
+    pdfDoc=await pdfjsLib.getDocument({data:ab.slice(0)}).promise;
+    pageCount=pdfDoc.numPages; curPage=1;
+    await loadPdfPage(curPage); updatePageInfo();
     $("stageHint").style.display="none";
     toast(`PDF読み込み完了（${pageCount}ページ）`);
-  }catch(err){
-    console.warn("Latest PDF load failed:",err);
-    // エラーは表示しない（PDFがまだ無いだけかもしれない）
-  }
+  }catch(err){ console.warn("Site PDF load failed:",err); toast("⚠️ PDF読み込みに失敗しました: "+err.message, 6000); }
 }
 
 async function loadPdfPage(n){
@@ -1233,7 +1257,8 @@ async function loadReservations(){
     if(dbUnsub) dbUnsub();
     dbUnsub=db.collection("reservations").orderBy("createdAt","desc")
       .onSnapshot(snap=>{
-        reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+        const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+        reservations=all.filter(r=>r.siteId===currentSiteId);
         onDataUpdate();
       }, err=>{ console.error(err); setConn(false); reservations=lsLoad(); onDataUpdate(); });
   } else {
@@ -1245,7 +1270,7 @@ async function saveRes(data,isNew=true){
     try{
       const {id: _id, ...docData} = data;
       if(isNew){
-        const ref=await db.collection("reservations").add({...docData,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        const ref=await db.collection("reservations").add({...docData,siteId:currentSiteId,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
         data.id=ref.id;
       } else {
         await db.collection("reservations").doc(data.id).set({...docData,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
@@ -1643,34 +1668,120 @@ function roundRect(ctx,x,y,w,h,r){
 
 $("btnSaveImg").addEventListener("click",saveImage);
 
-// 他のユーザーが新しいPDFをアップロードしたら自動で切り替える
-function watchCurrentPdf(){
-  if(!usingFb) return;
-  db.collection("settings").doc("currentPdf").onSnapshot(async snap=>{
-    if(!snap.exists) return;
-    const { pdfId, fileName, rotation } = snap.data();
-    // 回転の変更を即時反映
-    if(rotation != null && rotation !== normalRot){
-      normalRot = rotation; resizeStage();
+// ── 現場PDFをリアルタイム監視 ──
+function watchSitePdf(siteId){
+  if(!usingFb||!siteId) return;
+  if(pdfWatchUnsub){ pdfWatchUnsub(); pdfWatchUnsub=null; }
+  pdfWatchUnsub=db.collection("sites").doc(siteId).onSnapshot(async snap=>{
+    if(!snap.exists||snap.metadata.hasPendingWrites) return;
+    const {pdfId,fileName,rotation}=snap.data();
+    if(rotation!=null&&rotation!==normalRot){ normalRot=rotation; resizeStage(); }
+    if(pdfId&&pdfId!==currentPdfId){
+      toast(`📄 新しいPDFが登録されました（${fileName||""}）`);
+      await loadSitePdf(siteId);
     }
-    if(!pdfId || pdfId === currentPdfId) return; // 既に表示中なら無視
-    // 別のPDFに切り替わったので再読込
-    console.log("New PDF detected, reloading...");
-    toast(`📄 新しいPDFが登録されました（${fileName||""}）`);
-    await loadLatestPdf();
-  }, err=>console.warn("PDF watcher error:",err));
+  },err=>console.warn("Site watcher error:",err));
 }
 
 async function saveRotation(rot){
-  if(!usingFb) return;
-  try{ await db.collection("settings").doc("currentPdf").set({rotation:rot},{merge:true}); }
+  if(!usingFb||!currentSiteId) return;
+  try{ await db.collection("sites").doc(currentSiteId).update({rotation:rot}); }
   catch(e){ console.warn("Rotation save error:",e); }
 }
 
-loadReservations();
-loadLatestPdf();
-watchCurrentPdf(); // 他ユーザーのPDF更新を監視
+// ── 現場管理 ──
+function renderSiteSelect(){
+  const sel=$("siteSelect");
+  sel.innerHTML=sites.length===0
+    ? '<option value="">現場がありません</option>'
+    : sites.map(s=>`<option value="${s.id}"${s.id===currentSiteId?" selected":""}>${esc(s.name)}</option>`).join("");
+}
+
+async function selectSite(id){
+  if(currentSiteId===id) return;
+  currentSiteId=id;
+  sessionStorage.setItem("currentSiteId",id);
+  renderSiteSelect();
+  // PDFリセット
+  if(pdfWatchUnsub){ pdfWatchUnsub(); pdfWatchUnsub=null; }
+  pdfDoc=null; curPage=1; pageCount=0; normalRot=0;
+  pageImgCache.clear(); currentPdfId=null;
+  $("pdfInput").value="";
+  updatePageInfo(); redrawBg(); redrawOverlay();
+  // 予約・PDF読み込み
+  loadReservations();
+  await loadSitePdf(id);
+  watchSitePdf(id);
+}
+
+async function initSites(){
+  if(!usingFb){
+    currentSiteId="local";
+    $("siteSelect").innerHTML='<option value="local">現場（ローカル）</option>';
+    reservations=lsLoad(); onDataUpdate(); return;
+  }
+  siteUnsub=db.collection("sites").orderBy("createdAt","asc").onSnapshot(async snap=>{
+    sites=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderSiteSelect();
+    if(!currentSiteId){
+      const saved=sessionStorage.getItem("currentSiteId");
+      const target=sites.find(s=>s.id===saved)||sites[0];
+      if(target){ await selectSite(target.id); }
+      else{ showSiteModal(false); } // 現場ゼロ → 作成を促す
+    }
+  });
+}
+
+let siteEditId=null;
+function showSiteModal(isEdit=false){
+  siteEditId=isEdit?currentSiteId:null;
+  $("siteModalTitle").textContent=isEdit?"✏️ 現場を編集":"🏗 現場を追加";
+  $("siteName").value=isEdit?(sites.find(s=>s.id===currentSiteId)?.name||""):"";
+  $("btnSiteDel").style.display=isEdit&&sites.length>1?"inline-flex":"none";
+  $("siteModal").classList.add("open");
+  setTimeout(()=>$("siteName").focus(),100);
+}
+function closeSiteModal(){ $("siteModal").classList.remove("open"); }
+$("siteModalClose").addEventListener("click",closeSiteModal);
+$("siteModalCancel").addEventListener("click",closeSiteModal);
+$("siteModal").addEventListener("click",e=>{ if(e.target===$("siteModal"))closeSiteModal(); });
+$("siteName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("siteModalSave").click(); });
+$("btnSiteAdd").addEventListener("click",()=>showSiteModal(false));
+$("btnSiteEdit").addEventListener("click",()=>{ if(currentSiteId) showSiteModal(true); else toast("現場を選択してください"); });
+$("siteSelect").addEventListener("change",async e=>{ if(e.target.value) await selectSite(e.target.value); });
+
+$("siteModalSave").addEventListener("click",async()=>{
+  const name=$("siteName").value.trim();
+  if(!name){ toast("現場名を入力してください"); $("siteName").focus(); return; }
+  const btn=$("siteModalSave"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span>`;
+  try{
+    if(siteEditId){
+      await db.collection("sites").doc(siteEditId).update({name});
+      toast("現場名を変更しました ✅");
+    } else {
+      const ref=await db.collection("sites").add({name,pdfId:null,fileName:null,rotation:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      currentSiteId=null; // selectSite内の重複チェックを回避
+      await selectSite(ref.id);
+      toast(`「${name}」を追加しました ✅`);
+    }
+    closeSiteModal();
+  }catch(e){ toast("エラー: "+e.message); }
+  finally{ btn.disabled=false; btn.innerHTML="💾 保存"; }
+});
+
+$("btnSiteDel").addEventListener("click",async()=>{
+  const site=sites.find(s=>s.id===currentSiteId);
+  if(!site||!confirm(`「${site.name}」を削除しますか？\nこの現場の予約データもすべて削除されます。`)) return;
+  try{
+    const snap=await db.collection("reservations").where("siteId","==",currentSiteId).get();
+    const batch=db.batch(); snap.docs.forEach(d=>batch.delete(d.ref)); await batch.commit();
+    await db.collection("sites").doc(currentSiteId).delete();
+    closeSiteModal(); currentSiteId=null; toast("現場を削除しました");
+  }catch(e){ toast("削除エラー: "+e.message); }
+});
+
 resizeStage();
+initSites();
 toast("搬入予約システムへようこそ。", 4000);
 </script>
 </body>
