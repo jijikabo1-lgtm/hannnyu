@@ -224,8 +224,28 @@
     .site-btn:hover{background:rgba(255,255,255,.28)}
     @media(max-width:640px){.site-sel select{max-width:110px;font-size:12px}.site-btn{font-size:12px;padding:4px 7px}}
 
+    /* ── Map 2-column split ── */
+    .map-body-split{display:flex;align-items:flex-start}
+    .map-stage-col{flex:0 0 58%;min-width:0;padding:12px 16px}
+    .map-list-col{flex:1;min-width:0;border-left:1px solid var(--border);padding:12px 16px;overflow:visible}
+    .map-side-table{width:100%;border-collapse:collapse;font-size:12px}
+    .map-side-table th{background:var(--bg2);padding:6px 8px;text-align:left;font-weight:600;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0}
+    .map-side-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .map-side-table tr:last-child td{border-bottom:none}
+    .map-side-scroll{max-height:calc(100vh - 280px);overflow-y:auto;border:1px solid var(--border);border-radius:10px}
+    @media(max-width:900px){.map-body-split{flex-direction:column}.map-list-col{border-left:none;border-top:1px solid var(--border)}}
+
     /* Print */
-    @media print{.hdr,.tabs,.card-hdr .btn,.btn,.stage-wrap,.cfg-warn,.toast{display:none!important}.rtable{font-size:11px}.badge{border:1px solid #ccc}}
+    @media print{
+      .hdr,.tabs,.card-hdr .btn,.btn,.cfg-warn,.toast,.fs-btn,.stage-hint{display:none!important}
+      .rtable,.map-side-table{font-size:10px}
+      .badge{border:1px solid #ccc}
+      .map-body-split{flex-direction:row!important;align-items:flex-start!important}
+      .map-stage-col{flex:0 0 55%!important;padding:8px!important}
+      .map-list-col{flex:1!important;border-left:1px solid #ccc!important;padding:8px!important}
+      .map-side-scroll{max-height:none!important;overflow:visible!important;border:none!important}
+      .stage-wrap{max-height:none!important;overflow:visible!important}
+    }
 
     /* Mobile */
     @media(max-width:640px){.fgrid{grid-template-columns:1fr}.wrap{padding:10px 12px}.tabs{padding:0 12px}.hdr{padding:0 12px}.card-body{padding:12px}}
@@ -305,25 +325,42 @@
         <span style="font-size:12px;color:var(--muted);align-self:flex-end;white-space:nowrap">図面をクリック → 予約追加</span>
       </div>
 
-      <!-- stage -->
-      <div style="padding:12px 16px">
-        <div class="stage-wrap" id="stageWrap">
-          <canvas id="bg"></canvas>
-          <svg id="overlay"></svg>
-          <button class="fs-btn" id="btnFs">⛶ 全画面</button>
-          <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
+      <!-- split body: stage LEFT, table RIGHT -->
+      <div class="map-body-split">
+        <!-- LEFT: floor plan + page list -->
+        <div class="map-stage-col">
+          <div class="stage-wrap" id="stageWrap">
+            <canvas id="bg"></canvas>
+            <svg id="overlay"></svg>
+            <button class="fs-btn" id="btnFs">⛶ 全画面</button>
+            <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
+          </div>
+          <div style="margin-top:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <strong style="font-size:13px">このページの予約</strong>
+              <span id="mapCnt" style="font-size:12px;color:var(--muted)">0件</span>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:10px;max-height:200px;overflow-y:auto" id="mapList">
+              <div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">
+                図面をクリックして予約を追加してください
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <!-- page reservation list -->
-      <div style="padding:0 16px 16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <strong style="font-size:14px">このページの予約</strong>
-          <span id="mapCnt" style="font-size:12px;color:var(--muted)">0件</span>
-        </div>
-        <div style="border:1px solid var(--border);border-radius:10px;max-height:260px;overflow-y:auto" id="mapList">
-          <div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">
-            図面をクリックして予約を追加してください
+        <!-- RIGHT: all reservations table -->
+        <div class="map-list-col">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <strong style="font-size:14px">予約一覧</strong>
+            <span id="mapSideCnt" style="font-size:12px;color:var(--muted)">0件</span>
+          </div>
+          <div class="map-side-scroll">
+            <table class="map-side-table">
+              <thead><tr>
+                <th>搬入日</th><th>業者名</th><th>品目</th><th>場所</th><th>ステータス</th><th></th>
+              </tr></thead>
+              <tbody id="mapSideTbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">読み込み中…</td></tr></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1246,8 +1283,35 @@ function updateDatalists(){
   $("contactOpts").innerHTML=contacts.map(v=>`<option value="${esc(v)}">`).join("");
   $("floorOpts").innerHTML=floors.map(v=>`<option value="${esc(v)}">`).join("");
 }
+function updateMapSideTable(){
+  const tbody=$("mapSideTbody"), cnt=$("mapSideCnt");
+  const arr=[...reservations].sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
+  cnt.textContent=arr.length+"件";
+  if(!arr.length){
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">予約はありません</td></tr>`;
+    return;
+  }
+  const today=new Date().toISOString().slice(0,10);
+  const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  tbody.innerHTML=arr.map(r=>{
+    const isT=r.deliveryDate===today, isTm=r.deliveryDate===tomorrow;
+    const rowCls=isT?"row-today":isTm?"row-tomorrow":"";
+    return `<tr class="${rowCls}">
+      <td style="white-space:nowrap;font-weight:700">${esc(r.deliveryDate||"-")}</td>
+      <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
+      <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.items||"-").slice(0,30))}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.floor||"-")}</td>
+      <td><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span></td>
+      <td><div style="display:flex;gap:3px">
+        <button class="btn" style="padding:3px 6px;font-size:11px" title="図面で確認" onclick="jumpToMarker('${r.id}')">📍</button>
+        <button class="btn" style="padding:3px 6px;font-size:11px" onclick="openEditForm('${r.id}')">✏</button>
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
 function onDataUpdate(){
-  redrawOverlay(); updateMapList(); renderTable(); updateStats(); updateVendorSelects(); updatePageFilter(); updateDatalists();
+  redrawOverlay(); updateMapList(); updateMapSideTable(); renderTable(); updateStats(); updateVendorSelects(); updatePageFilter(); updateDatalists();
   // カレンダータブが表示中なら再描画
   if(document.getElementById("tab-cal")?.classList.contains("active")) renderCalendar();
 }
