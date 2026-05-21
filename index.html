@@ -226,8 +226,8 @@
 
     /* ── Map 2-column split ── */
     .map-body-split{display:flex;align-items:flex-start}
-    .map-stage-col{flex:0 0 58%;min-width:0;padding:12px 16px}
-    .map-list-col{flex:1;min-width:0;border-left:1px solid var(--border);padding:12px 16px;overflow:visible}
+    .map-stage-col{flex:0 0 72%;min-width:0;padding:12px 16px}
+    .map-list-col{flex:0 0 28%;min-width:0;border-left:1px solid var(--border);padding:12px 16px;overflow:visible}
     .map-side-table{width:100%;border-collapse:collapse;font-size:12px}
     .map-side-table th{background:var(--bg2);padding:6px 8px;text-align:left;font-weight:600;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0}
     .map-side-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -1650,11 +1650,28 @@ async function saveImage(){
   btn.disabled=true; btn.textContent="⏳ 生成中…";
   try{
     const scale=2;
+    // ── table panel layout (logical px) ──
+    const tblW=300, tPad=10, tTitleH=28, tHeadH=22, tRowH=20;
+    const tblArr=[...reservations].sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
+    const tblBodyH=tblArr.length*tRowH;
+    const tblTotalH=tPad+tTitleH+tHeadH+tblBodyH+tPad;
+    // cols: [label, width, getter]
+    const tCols=[
+      ["No.",  20, (r,i)=>String(i+1)],
+      ["搬入日", 70, r=>r.deliveryDate||"-"],
+      ["業者名", 80, r=>(r.vendorName||"-").slice(0,11)],
+      ["品目",  80, r=>(r.items||"-").slice(0,13)],
+      ["ステータス",50, r=>r.status||"予約中"],
+    ];
+    const totalW=stageW+tblW;
+    const totalH=Math.max(stageH, tblTotalH);
     const out=document.createElement("canvas");
-    out.width=stageW*scale; out.height=stageH*scale;
+    out.width=totalW*scale; out.height=totalH*scale;
     const octx=out.getContext("2d");
+    // white background
     octx.fillStyle="#ffffff"; octx.fillRect(0,0,out.width,out.height);
-    octx.drawImage(bgCanvas,0,0,out.width,out.height);
+    // ── draw floor plan (left) ──
+    octx.drawImage(bgCanvas,0,0,stageW*scale,stageH*scale);
     const arr=getPageRes();
     const DEF_DX=24/(imgRect.iw*imgRect.sc);
     const DEF_DY=-52/(imgRect.ih*imgRect.sc);
@@ -1700,11 +1717,67 @@ async function saveImage(){
       const t3txt=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
       octx.fillText(t3txt,bx+12*scale,by+45*scale);
     });
+    // floor plan footer label
     const pageLabel=pdfDoc?`P.${curPage}/${pageCount}`:"";
     const dateLabel=new Date().toLocaleDateString("ja-JP");
-    octx.fillStyle="rgba(100,116,139,0.6)"; octx.textAlign="right"; octx.textBaseline="bottom";
+    octx.fillStyle="rgba(100,116,139,0.6)"; octx.textAlign="left"; octx.textBaseline="bottom";
     octx.font=`${11*scale}px system-ui,sans-serif`;
-    octx.fillText(`搬入予約図面 ${pageLabel}　${dateLabel}`,out.width-8*scale,out.height-6*scale);
+    octx.fillText(`搬入予約図面 ${pageLabel}　${dateLabel}`,8*scale,totalH*scale-6*scale);
+    // ── draw table panel (right) ──
+    const tx=stageW*scale;
+    octx.fillStyle="#f8fafc"; octx.fillRect(tx,0,tblW*scale,totalH*scale);
+    // divider
+    octx.fillStyle="#cbd5e1"; octx.fillRect(tx,0,1*scale,totalH*scale);
+    // title
+    let cy=tPad;
+    octx.fillStyle="#0f172a"; octx.textAlign="center"; octx.textBaseline="middle";
+    octx.font=`bold ${12*scale}px system-ui,sans-serif`;
+    octx.fillText("予約一覧",tx+(tblW/2)*scale,(cy+tTitleH/2)*scale);
+    cy+=tTitleH;
+    // header row
+    octx.fillStyle="#e2e8f0"; octx.fillRect(tx,cy*scale,tblW*scale,tHeadH*scale);
+    octx.strokeStyle="#cbd5e1"; octx.lineWidth=0.5*scale;
+    octx.beginPath(); octx.moveTo(tx,(cy+tHeadH)*scale); octx.lineTo(tx+tblW*scale,(cy+tHeadH)*scale); octx.stroke();
+    let cx2=tPad;
+    tCols.forEach(([label,w])=>{
+      octx.fillStyle="#475569"; octx.textAlign="left"; octx.textBaseline="middle";
+      octx.font=`bold ${9*scale}px system-ui,sans-serif`;
+      octx.fillText(label,tx+(cx2+2)*scale,(cy+tHeadH/2)*scale);
+      cx2+=w;
+    });
+    cy+=tHeadH;
+    // data rows
+    tblArr.forEach((r,i)=>{
+      const ry=cy+i*tRowH;
+      if(i%2===0){ octx.fillStyle="#ffffff"; octx.fillRect(tx,ry*scale,tblW*scale,tRowH*scale); }
+      // bottom border
+      octx.strokeStyle="#e2e8f0"; octx.lineWidth=0.5*scale;
+      octx.beginPath(); octx.moveTo(tx,(ry+tRowH)*scale); octx.lineTo(tx+tblW*scale,(ry+tRowH)*scale); octx.stroke();
+      let cx3=tPad;
+      const stColors={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
+      tCols.forEach(([,w,getter],ci)=>{
+        const cellTxt=getter(r,i);
+        octx.fillStyle=ci===4?(stColors[cellTxt]||"#64748b"):"#0f172a";
+        octx.textAlign="left"; octx.textBaseline="middle";
+        octx.font=`${9*scale}px system-ui,sans-serif`;
+        // vendor dot for vendor column
+        if(ci===2){
+          octx.beginPath(); octx.arc(tx+(cx3+5)*scale,(ry+tRowH/2)*scale,4*scale,0,Math.PI*2);
+          octx.fillStyle=vColor(r.vendorName||""); octx.fill();
+          octx.fillStyle="#0f172a"; octx.textAlign="left"; octx.textBaseline="middle";
+          octx.font=`${9*scale}px system-ui,sans-serif`;
+          octx.fillText(cellTxt,tx+(cx3+12)*scale,(ry+tRowH/2)*scale);
+        } else {
+          octx.fillText(cellTxt,tx+(cx3+2)*scale,(ry+tRowH/2)*scale);
+        }
+        cx3+=w;
+      });
+    });
+    if(!tblArr.length){
+      octx.fillStyle="#94a3b8"; octx.textAlign="center"; octx.textBaseline="middle";
+      octx.font=`${10*scale}px system-ui,sans-serif`;
+      octx.fillText("予約はありません",tx+(tblW/2)*scale,(cy+40)*scale);
+    }
     out.toBlob(blob=>{
       if(!blob){ toast("画像生成に失敗しました"); return; }
       const a=document.createElement("a");
