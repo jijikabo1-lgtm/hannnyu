@@ -652,7 +652,7 @@ async function deleteCachedPdf(id){
 let stageW=1, stageH=1;
 let imgRect = { iw:1, ih:1, sc:1, rot:0 };
 
-const BW = 172, BH = 60;
+let BW = 172, BH = 60;
 let drag=null, pendingDrag=null;
 const DRAG_THR = 6;
 
@@ -671,6 +671,8 @@ function resizeStage(){
     cssW=Math.max(1,Math.round(r.width)); cssH=Math.max(1,Math.round(r.height));
   }
   stageW=cssW; stageH=cssH;
+  const _bs=Math.min(1,Math.min(stageW,stageH)/480);
+  BW=Math.max(100,Math.round(172*_bs)); BH=Math.max(44,Math.round(60*_bs));
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
   bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
   overlay.style.width=cssW+"px"; overlay.style.height=cssH+"px";
@@ -990,7 +992,8 @@ function redrawOverlay(){
     const bdx = res.bubbleDx ?? DEF_DX;
     const bdy = res.bubbleDy ?? DEF_DY;
     const _b = imgRatioToCanvasPx(res.markerX + bdx, res.markerY + bdy);
-    const bx=_b.x, by=_b.y;
+    const bx=clamp(_b.x, -BW*0.3, stageW-BW*0.7);
+    const by=clamp(_b.y, -BH*0.3, stageH-BH*0.7);
     const bcx=bx+BW/2, bcy=by+BH/2;
     const rot=isFs?fsRot:0;
     const line=mk("line",{x1:ax,y1:ay,x2:bcx,y2:bcy,stroke:color,"stroke-width":1.8,"stroke-opacity":0.75,"stroke-dasharray":"4 2"});
@@ -1082,8 +1085,8 @@ overlay.addEventListener("pointermove",e=>{
     let ddx=rawDx, ddy=rawDy;
     if(nr!==0){ const rad=-nr*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad); ddx=rawDx*cos-rawDy*sin; ddy=rawDx*sin+rawDy*cos; }
     const isc=imgRect.iw*imgRect.sc, ihc=imgRect.ih*imgRect.sc;
-    res.bubbleDx=clamp(drag.baseDx+ddx,-isc,isc)/isc;
-    res.bubbleDy=clamp(drag.baseDy+ddy,-ihc,ihc)/ihc;
+    res.bubbleDx=clamp((drag.baseDx+ddx)/isc,-0.45,0.45);
+    res.bubbleDy=clamp((drag.baseDy+ddy)/ihc,-0.45,0.45);
   }
   redrawOverlay();
   e.preventDefault();
