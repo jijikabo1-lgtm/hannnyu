@@ -798,8 +798,9 @@ async function loadLatestPdf(){
   try{
     const doc = await db.collection("settings").doc("currentPdf").get();
     if(!doc.exists) return;
-    const { pdfId, fileName } = doc.data();
+    const { pdfId, fileName, rotation } = doc.data();
     if(!pdfId) return;
+    if(rotation != null){ normalRot = rotation; }
 
     // まずローカルキャッシュをチェック
     const cached = await loadCachedPdf(pdfId);
@@ -886,10 +887,10 @@ $("btnNext").addEventListener("click",async()=>{ if(curPage<pageCount){ curPage+
 $("fsBtnPrev").addEventListener("click",async()=>{ if(curPage>1){ curPage--; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); } });
 $("fsBtnNext").addEventListener("click",async()=>{ if(curPage<pageCount){ curPage++; await loadPdfPage(curPage); updatePageInfo(); redrawOverlay(); updateMapList(); } });
 
-$("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; resizeStage(); });
-$("btnRotR").addEventListener("click",()=>{ normalRot=(normalRot+90)%360; resizeStage(); });
-$("fsBtnRotL").addEventListener("click",()=>{ fsRot=(fsRot-90+360)%360; applyFsRotClass(); resizeStage(); });
-$("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; applyFsRotClass(); resizeStage(); });
+$("btnRotL").addEventListener("click",()=>{ normalRot=(normalRot-90+360)%360; saveRotation(normalRot); resizeStage(); });
+$("btnRotR").addEventListener("click",()=>{ normalRot=(normalRot+90)%360; saveRotation(normalRot); resizeStage(); });
+$("fsBtnRotL").addEventListener("click",()=>{ fsRot=(fsRot-90+360)%360; normalRot=fsRot; saveRotation(normalRot); applyFsRotClass(); resizeStage(); });
+$("fsBtnRotR").addEventListener("click",()=>{ fsRot=(fsRot+90)%360; normalRot=fsRot; saveRotation(normalRot); applyFsRotClass(); resizeStage(); });
 function applyFsRotClass(){
   stageWrap.classList.remove("rot90","rot180","rot270");
   if(fsRot===90) stageWrap.classList.add("rot90");
@@ -1644,13 +1645,23 @@ function watchCurrentPdf(){
   if(!usingFb) return;
   db.collection("settings").doc("currentPdf").onSnapshot(async snap=>{
     if(!snap.exists) return;
-    const { pdfId, fileName } = snap.data();
+    const { pdfId, fileName, rotation } = snap.data();
+    // 回転の変更を即時反映
+    if(rotation != null && rotation !== normalRot){
+      normalRot = rotation; resizeStage();
+    }
     if(!pdfId || pdfId === currentPdfId) return; // 既に表示中なら無視
     // 別のPDFに切り替わったので再読込
     console.log("New PDF detected, reloading...");
     toast(`📄 新しいPDFが登録されました（${fileName||""}）`);
     await loadLatestPdf();
   }, err=>console.warn("PDF watcher error:",err));
+}
+
+async function saveRotation(rot){
+  if(!usingFb) return;
+  try{ await db.collection("settings").doc("currentPdf").set({rotation:rot},{merge:true}); }
+  catch(e){ console.warn("Rotation save error:",e); }
 }
 
 loadReservations();
