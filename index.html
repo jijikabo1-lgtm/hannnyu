@@ -317,6 +317,12 @@
           <label>日付フィルター</label>
           <input type="date" id="fltDateMap" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" />
         </div>
+        <div class="field" style="min-width:130px">
+          <label>🚪 搬入口</label>
+          <select id="fltEntranceMap" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px">
+            <option value="">全搬入口</option>
+          </select>
+        </div>
         <div style="display:flex;gap:6px;align-self:flex-end">
           <button class="btn" id="btnRotL" title="左90°" style="padding:8px 12px;font-size:18px">↺</button>
           <button class="btn" id="btnRotR" title="右90°" style="padding:8px 12px;font-size:18px">↻</button>
@@ -357,7 +363,7 @@
           <div class="map-side-scroll">
             <table class="map-side-table">
               <thead><tr>
-                <th>搬入日</th><th>業者名</th><th>品目</th><th>場所</th><th>ステータス</th><th></th>
+                <th>搬入日</th><th>業者名</th><th>🚪搬入口</th><th>品目</th><th>ステータス</th><th></th>
               </tr></thead>
               <tbody id="mapSideTbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">読み込み中…</td></tr></tbody>
             </table>
@@ -395,6 +401,7 @@
           <div class="field"><label>日付（から）</label><input type="date" id="fltFrom" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" /></div>
           <div class="field"><label>日付（まで）</label><input type="date" id="fltTo" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;width:auto" /></div>
           <div class="field"><label>フロア/ページ</label><select id="fltPage" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option></select></div>
+          <div class="field"><label>🚪 搬入口</label><select id="fltEntranceList" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px"><option value="">全て</option></select></div>
           <button class="btn" id="btnClearFlt" style="align-self:flex-end">クリア</button>
         </div>
         <!-- stats -->
@@ -411,7 +418,7 @@
           <table class="rtable">
             <thead><tr>
               <th>No.</th><th>搬入日</th><th>時間</th><th>業者名</th><th>担当者</th>
-              <th>場所・フロア</th><th>品目</th><th>車両</th><th>ステータス</th><th>操作</th>
+              <th>🚪 搬入口</th><th>場所・フロア</th><th>品目</th><th>車両</th><th>ステータス</th><th>操作</th>
             </tr></thead>
             <tbody id="resTbody"><tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">読み込み中…</td></tr></tbody>
           </table>
@@ -491,6 +498,7 @@
         <div class="field"><label>開始時刻</label><input type="time" id="fTs" /></div>
         <div class="field"><label>終了時刻（予定）</label><input type="time" id="fTe" /></div>
         <div class="field"><label>フロア / 搬入場所</label><input type="text" id="fFloor" list="floorOpts" placeholder="例：1F 玄関ホール" /><datalist id="floorOpts"></datalist></div>
+        <div class="field"><label>🚪 搬入口 <span class="req">*</span></label><input type="text" id="fEntrance" list="entranceOpts" placeholder="例：北側搬入口、南口、A搬入口…" /><datalist id="entranceOpts"></datalist></div>
         <div class="field"><label>車両種別</label>
           <select id="fVehicle"><option value="">選択なし</option><option>軽トラック</option><option>1トン車</option><option>2トン車</option><option>2トンユニック車</option><option>4トン車</option><option>4トンユニック車</option><option>10トン車</option><option>10トンユニック車</option><option>ダンプ</option><option>クレーン車</option><option>フォークリフト</option><option>セミトレーラー</option><option>軽自動車</option><option>その他</option></select>
         </div>
@@ -1019,6 +1027,18 @@ function vColor(name){
   const hues=[0,30,60,120,180,210,240,270,300,330];
   return `hsl(${hues[Math.abs(h)%hues.length]},70%,45%)`;
 }
+function eColor(entrance){
+  if(!entrance) return null;
+  const n=String(entrance);
+  if(/北/.test(n)) return "#dc2626";
+  if(/南/.test(n)) return "#2563eb";
+  if(/東/.test(n)) return "#16a34a";
+  if(/西/.test(n)) return "#d97706";
+  let h=0; for(const c of n) h=((h<<5)-h)+c.charCodeAt(0);
+  const hues=[0,30,60,120,180,210,240,270,300,330];
+  return `hsl(${hues[Math.abs(h)%hues.length]},70%,42%)`;
+}
+function resColor(r){ return eColor(r.entrance) || vColor(r.vendorName||"その他"); }
 
 function mk(tag,attrs={}){
   const el=document.createElementNS(svgNS,tag);
@@ -1027,11 +1047,12 @@ function mk(tag,attrs={}){
 }
 
 function getPageRes(){
-  const vf=$("fltVendorMap").value, df=$("fltDateMap").value;
+  const vf=$("fltVendorMap").value, df=$("fltDateMap").value, ef=$("fltEntranceMap").value;
   return reservations.filter(r=>{
     if(r.pdfPage!==curPage) return false;
     if(vf && r.vendorName!==vf) return false;
     if(df && r.deliveryDate!==df) return false;
+    if(ef && r.entrance!==ef) return false;
     return true;
   });
 }
@@ -1046,7 +1067,7 @@ function redrawOverlay(){
   arr.forEach((res,idx)=>{
     if(res.markerX==null||res.markerY==null) return;
     const isSel=res.id===selId;
-    const color=vColor(res.vendorName||"その他");
+    const color=resColor(res);
     const g=mk("g",{"data-id":res.id});
     const a=imgRatioToCanvasPx(res.markerX, res.markerY);
     const ax=a.x, ay=a.y;
@@ -1076,7 +1097,9 @@ function redrawOverlay(){
     const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
     t2.textContent=res.deliveryDate||"日付未設定"; bg2.appendChild(t2);
     const t3=mk("text",{x:12,y:45,"font-size":"10",fill:"#6b7280"});
-    t3.textContent=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
+    const t3time=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):"";
+    const t3ent=res.entrance?("🚪"+(res.entrance).slice(0,10)):"";
+    t3.textContent=t3time&&t3ent?`${t3time} ${t3ent}`:t3time||t3ent||(res.items||"").slice(0,20);
     bg2.appendChild(t3);
     const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
     const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
@@ -1181,13 +1204,13 @@ function updateMapList(){
     div.className="mitem"+(res.id===selId?" selected":"");
     div.dataset.id=res.id;
     div.innerHTML=`
-      <div style="min-width:22px;height:22px;border-radius:50%;background:${vColor(res.vendorName||"")};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">${i+1}</div>
+      <div style="min-width:22px;height:22px;border-radius:50%;background:${resColor(res)};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">${i+1}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
           ${esc(res.vendorName||"未設定")}
           <span class="badge badge-${esc(res.status||"予約中")}">${esc(res.status||"予約中")}</span>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(res.deliveryDate||"")} ${esc(res.timeStart||"")}${res.timeEnd?" 〜 "+esc(res.timeEnd):""} 　${esc((res.items||"").slice(0,28))}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${res.entrance?`<span style="color:${resColor(res)};font-weight:700">🚪${esc(res.entrance)}</span> `:""}${esc(res.deliveryDate||"")} ${esc(res.timeStart||"")}${res.timeEnd?" 〜 "+esc(res.timeEnd):""} 　${esc((res.items||"").slice(0,28))}</div>
       </div>
       <div style="display:flex;gap:4px">
         <button class="btn" style="padding:5px 8px;font-size:12px" data-act="edit">✏</button>
@@ -1207,22 +1230,23 @@ function updateMapList(){
 function renderTable(){
   const tbody=$("resTbody");
   let arr=[...reservations];
-  const vf=$("fltVendorList").value, sf=$("fltStatus").value;
+  const vf=$("fltVendorList").value, sf=$("fltStatus").value, ef=$("fltEntranceList").value;
   const df=$("fltFrom").value, dt=$("fltTo").value, pf=$("fltPage").value;
   const sq=($("fltSearch")?.value||"").trim().toLowerCase();
   if(vf) arr=arr.filter(r=>r.vendorName===vf);
   if(sf) arr=arr.filter(r=>(r.status||"予約中")===sf);
+  if(ef) arr=arr.filter(r=>r.entrance===ef);
   if(df) arr=arr.filter(r=>r.deliveryDate>=df);
   if(dt) arr=arr.filter(r=>r.deliveryDate<=dt);
   if(pf) arr=arr.filter(r=>`${r.pdfPage||1}ページ`===pf);
   if(sq){
     arr=arr.filter(r=>{
-      return [r.vendorName,r.contactPerson,r.items,r.notes,r.floor,r.phone]
+      return [r.vendorName,r.contactPerson,r.items,r.notes,r.floor,r.phone,r.entrance]
         .some(v=>String(v||"").toLowerCase().includes(sq));
     });
   }
   arr.sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
-  if(!arr.length){ tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--muted)">予約はありません</td></tr>`; return; }
+  if(!arr.length){ tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--muted)">予約はありません</td></tr>`; return; }
   // 本日/明日判定
   const today=new Date().toISOString().slice(0,10);
   const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
@@ -1231,12 +1255,14 @@ function renderTable(){
     const isPast=r.deliveryDate&&r.deliveryDate<today&&(r.status||"予約中")==="予約中";
     const rowCls=isT?"row-today":isTm?"row-tomorrow":isPast?"row-past":"";
     const dateBadge=isT?'<span class="badge-today">今日</span>':isTm?'<span class="badge-tomorrow">明日</span>':"";
+    const entColor=resColor(r);
     return `<tr class="${rowCls}">
     <td style="font-weight:700;color:var(--muted)">${i+1}</td>
     <td style="font-weight:700;white-space:nowrap">${esc(r.deliveryDate||"-")}${dateBadge}</td>
     <td style="white-space:nowrap;font-size:12px">${esc(r.timeStart||"-")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}</td>
     <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
     <td style="font-size:12px">${esc(r.contactPerson||"-")}<br>${r.phone?`<a href="tel:${esc(r.phone)}" style="color:var(--brand);text-decoration:none">📞${esc(r.phone)}</a>`:`<span style="color:var(--muted)"></span>`}</td>
+    <td style="font-size:12px;font-weight:700"><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:${entColor};flex-shrink:0"></span>${esc(r.entrance||"-")}</span></td>
     <td style="font-size:12px">${esc(r.floor||"-")}<br><span style="color:var(--muted);font-size:11px">P.${r.pdfPage||1}</span></td>
     <td style="font-size:12px;max-width:160px">${esc((r.items||"-").slice(0,50))}</td>
     <td style="font-size:12px">${esc(r.vehicleType||"-")}</td>
@@ -1267,6 +1293,14 @@ function updateVendorSelects(){
     vendors.forEach(v=>{ const o=document.createElement("option"); o.value=o.textContent=v; s.appendChild(o); });
     if(cur) s.value=cur;
   });
+  const entrances=[...new Set(reservations.map(r=>r.entrance).filter(Boolean))].sort();
+  ["fltEntranceMap","fltEntranceList"].forEach(id=>{
+    const s=$(id); if(!s) return;
+    const cur=s.value;
+    s.innerHTML=`<option value="">${id==="fltEntranceMap"?"全搬入口":"全て"}</option>`;
+    entrances.forEach(v=>{ const o=document.createElement("option"); o.value=o.textContent=v; s.appendChild(o); });
+    if(cur) s.value=cur;
+  });
 }
 function updatePageFilter(){
   const pages=[...new Set(reservations.map(r=>`${r.pdfPage||1}ページ`))].sort();
@@ -1279,9 +1313,11 @@ function updateDatalists(){
   const vendors=[...new Set(reservations.map(r=>r.vendorName).filter(Boolean))].sort();
   const contacts=[...new Set(reservations.map(r=>r.contactPerson).filter(Boolean))].sort();
   const floors=[...new Set(reservations.map(r=>r.floor).filter(Boolean))].sort();
+  const entrances=[...new Set(reservations.map(r=>r.entrance).filter(Boolean))].sort();
   $("vendorOpts").innerHTML=vendors.map(v=>`<option value="${esc(v)}">`).join("");
   $("contactOpts").innerHTML=contacts.map(v=>`<option value="${esc(v)}">`).join("");
   $("floorOpts").innerHTML=floors.map(v=>`<option value="${esc(v)}">`).join("");
+  $("entranceOpts").innerHTML=entrances.map(v=>`<option value="${esc(v)}">`).join("");
 }
 function updateMapSideTable(){
   const tbody=$("mapSideTbody"), cnt=$("mapSideCnt");
@@ -1296,11 +1332,12 @@ function updateMapSideTable(){
   tbody.innerHTML=arr.map(r=>{
     const isT=r.deliveryDate===today, isTm=r.deliveryDate===tomorrow;
     const rowCls=isT?"row-today":isTm?"row-tomorrow":"";
+    const ec=resColor(r);
     return `<tr class="${rowCls}">
       <td style="white-space:nowrap;font-weight:700">${esc(r.deliveryDate||"-")}</td>
       <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
-      <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.items||"-").slice(0,30))}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.floor||"-")}</td>
+      <td style="font-size:11px;font-weight:700;color:${ec}">${esc(r.entrance||"-")}</td>
+      <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc((r.items||"-").slice(0,25))}</td>
       <td><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span></td>
       <td><div style="display:flex;gap:3px">
         <button class="btn" style="padding:3px 6px;font-size:11px" title="図面で確認" onclick="jumpToMarker('${r.id}')">📍</button>
@@ -1368,13 +1405,13 @@ function openEditForm(id){
   $("fId").value=id; $("fVendor").value=r.vendorName||""; $("fContact").value=r.contactPerson||"";
   $("fPhone").value=r.phone||""; $("fDate").value=r.deliveryDate||"";
   $("fTs").value=r.timeStart||""; $("fTe").value=r.timeEnd||"";
-  $("fFloor").value=r.floor||""; $("fVehicle").value=r.vehicleType||"";
+  $("fFloor").value=r.floor||""; $("fEntrance").value=r.entrance||""; $("fVehicle").value=r.vehicleType||"";
   $("fItems").value=r.items||""; $("fNotes").value=r.notes||"";
   $("fStatus").value=r.status||"予約中"; $("statusField").style.display="block";
   $("formModal").classList.add("open");
 }
 window.openEditForm=openEditForm;
-function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fTs","fTe","fFloor","fItems","fNotes"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
+function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fTs","fTe","fFloor","fEntrance","fItems","fNotes"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
 function closeForm(){ $("formModal").classList.remove("open"); editingId=null; pendingMx=pendingMy=null; }
 $("formClose").addEventListener("click",closeForm);
 $("formCancel").addEventListener("click",closeForm);
@@ -1384,9 +1421,11 @@ $("formSave").addEventListener("click",async()=>{
   const vendorName=$("fVendor").value.trim();
   const deliveryDate=$("fDate").value;
   const items=$("fItems").value.trim();
+  const entrance=$("fEntrance").value.trim();
   if(!vendorName){ toast("業者名を入力してください"); $("fVendor").focus(); return; }
   if(!deliveryDate){ toast("搬入日を入力してください"); $("fDate").focus(); return; }
   if(!items){ toast("搬入品目を入力してください"); $("fItems").focus(); return; }
+  if(!entrance){ toast("搬入口を入力してください"); $("fEntrance").focus(); return; }
 
   // ── 重複予約チェック ──
   const ts=$("fTs").value, te=$("fTe").value, fl=$("fFloor").value.trim();
@@ -1429,7 +1468,7 @@ $("formSave").addEventListener("click",async()=>{
   const data={
     vendorName, contactPerson:$("fContact").value.trim(), phone:$("fPhone").value.trim(),
     deliveryDate, timeStart:$("fTs").value, timeEnd:$("fTe").value,
-    floor:$("fFloor").value.trim(), vehicleType:$("fVehicle").value,
+    floor:$("fFloor").value.trim(), entrance, vehicleType:$("fVehicle").value,
     items, notes:$("fNotes").value.trim(),
     status:$("fStatus").value||"予約中",
     pdfPage:parseInt($("fPage").value)||curPage,
@@ -1450,6 +1489,7 @@ function showDetail(id){
       <span style="color:var(--muted)">電話番号</span><span>${r.phone?`<a href="tel:${esc(r.phone)}" style="color:var(--brand);font-weight:700;text-decoration:none;font-size:15px">📞 ${esc(r.phone)}</a>`:"-"}</span>
       <span style="color:var(--muted)">搬入日</span><strong>${esc(r.deliveryDate||"-")}</strong>
       <span style="color:var(--muted)">時間</span><span>${esc(r.timeStart||"-")} 〜 ${esc(r.timeEnd||"-")}</span>
+      <span style="color:var(--muted)">搬入口</span><span style="font-weight:700;color:${resColor(r)}">${esc(r.entrance||"-")}</span>
       <span style="color:var(--muted)">場所</span><span>${esc(r.floor||"-")}</span>
       <span style="color:var(--muted)">車両</span><span>${esc(r.vehicleType||"-")}</span>
       <span style="color:var(--muted)">品目</span><span style="white-space:pre-wrap">${esc(r.items||"-")}</span>
@@ -1497,7 +1537,7 @@ window.jumpToMarker = async function(id){
     await loadPdfPage(curPage); updatePageInfo();
   }
   // 該当業者のフィルターを解除（マーカーが隠れていたら表示）
-  $("fltVendorMap").value=""; $("fltDateMap").value="";
+  $("fltVendorMap").value=""; $("fltDateMap").value=""; $("fltEntranceMap").value="";
   selId=id;
   redrawOverlay(); updateMapList();
   // スクロール
@@ -1599,7 +1639,7 @@ function makeCalCell(date,isOther){
     document.querySelectorAll(".tab-pane").forEach(p=>p.classList.remove("active"));
     document.querySelector('.tab-btn[data-tab="list"]').classList.add("active");
     $("tab-list").classList.add("active");
-    ["fltVendorList","fltStatus","fltPage","fltSearch"].forEach(id=>{ const e=$(id); if(e) e.value=""; });
+    ["fltVendorList","fltStatus","fltPage","fltSearch","fltEntranceList"].forEach(id=>{ const e=$(id); if(e) e.value=""; });
     $("fltFrom").value=dateStr; $("fltTo").value=dateStr;
     document.querySelectorAll("[data-quick]").forEach(c=>c.classList.remove("active"));
     renderTable();
@@ -1610,14 +1650,14 @@ $("calPrev").addEventListener("click",()=>{ calMonth--; if(calMonth<0){calMonth=
 $("calNext").addEventListener("click",()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
 $("calToday").addEventListener("click",()=>{ calYear=new Date().getFullYear(); calMonth=new Date().getMonth(); renderCalendar(); });
 
-["fltVendorMap","fltDateMap"].forEach(id=>$(id).addEventListener("change",()=>{ redrawOverlay(); updateMapList(); }));
-["fltVendorList","fltStatus","fltFrom","fltTo","fltPage","fltSearch"].forEach(id=>{
+["fltVendorMap","fltDateMap","fltEntranceMap"].forEach(id=>$(id).addEventListener("change",()=>{ redrawOverlay(); updateMapList(); updateMapSideTable(); }));
+["fltVendorList","fltStatus","fltFrom","fltTo","fltPage","fltSearch","fltEntranceList"].forEach(id=>{
   const el=$(id); if(!el) return;
   el.addEventListener("input",renderTable);
   el.addEventListener("change",renderTable);
 });
 $("btnClearFlt").addEventListener("click",()=>{
-  ["fltVendorList","fltStatus","fltFrom","fltTo","fltPage","fltSearch"].forEach(id=>{ const e=$(id); if(e) e.value=""; });
+  ["fltVendorList","fltStatus","fltFrom","fltTo","fltPage","fltSearch","fltEntranceList"].forEach(id=>{ const e=$(id); if(e) e.value=""; });
   document.querySelectorAll("[data-quick]").forEach(c=>c.classList.remove("active"));
   renderTable();
 });
@@ -1625,18 +1665,19 @@ $("btnClearFlt").addEventListener("click",()=>{
 $("btnCsv").addEventListener("click",()=>{
   // 現在の一覧フィルターを反映してエクスポート
   let arr=[...reservations];
-  const vf=$("fltVendorList").value, sf=$("fltStatus").value;
+  const vf=$("fltVendorList").value, sf=$("fltStatus").value, ef=$("fltEntranceList").value;
   const df=$("fltFrom").value, dt=$("fltTo").value, pf=$("fltPage").value;
   const sq=($("fltSearch")?.value||"").trim().toLowerCase();
   if(vf) arr=arr.filter(r=>r.vendorName===vf);
   if(sf) arr=arr.filter(r=>(r.status||"予約中")===sf);
+  if(ef) arr=arr.filter(r=>r.entrance===ef);
   if(df) arr=arr.filter(r=>r.deliveryDate>=df);
   if(dt) arr=arr.filter(r=>r.deliveryDate<=dt);
   if(pf) arr=arr.filter(r=>`${r.pdfPage||1}ページ`===pf);
-  if(sq) arr=arr.filter(r=>[r.vendorName,r.contactPerson,r.items,r.notes,r.floor].some(v=>String(v||"").toLowerCase().includes(sq)));
+  if(sq) arr=arr.filter(r=>[r.vendorName,r.contactPerson,r.items,r.notes,r.floor,r.entrance].some(v=>String(v||"").toLowerCase().includes(sq)));
   arr.sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
-  const headers=["No.","搬入日","開始","終了","業者名","担当者","電話","フロア","品目","車両","ステータス","備考"];
-  const rows=arr.map((r,i)=>[i+1,r.deliveryDate||"",r.timeStart||"",r.timeEnd||"",r.vendorName||"",r.contactPerson||"",r.phone||"",r.floor||"",r.items||"",r.vehicleType||"",r.status||"予約中",r.notes||""]);
+  const headers=["No.","搬入日","開始","終了","業者名","担当者","電話","搬入口","フロア","品目","車両","ステータス","備考"];
+  const rows=arr.map((r,i)=>[i+1,r.deliveryDate||"",r.timeStart||"",r.timeEnd||"",r.vendorName||"",r.contactPerson||"",r.phone||"",r.entrance||"",r.floor||"",r.items||"",r.vehicleType||"",r.status||"予約中",r.notes||""]);
   const csv=[headers,...rows].map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));
@@ -1651,16 +1692,17 @@ async function saveImage(){
   try{
     const scale=2;
     // ── table panel layout (logical px) ──
-    const tblW=300, tPad=10, tTitleH=28, tHeadH=22, tRowH=20;
+    const tblW=346, tPad=10, tTitleH=28, tHeadH=22, tRowH=20;
     const tblArr=[...reservations].sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
     const tblBodyH=tblArr.length*tRowH;
     const tblTotalH=tPad+tTitleH+tHeadH+tblBodyH+tPad;
     // cols: [label, width, getter]
     const tCols=[
-      ["No.",  20, (r,i)=>String(i+1)],
-      ["搬入日", 70, r=>r.deliveryDate||"-"],
-      ["業者名", 80, r=>(r.vendorName||"-").slice(0,11)],
-      ["品目",  80, r=>(r.items||"-").slice(0,13)],
+      ["No.",  18, (r,i)=>String(i+1)],
+      ["搬入日", 64, r=>r.deliveryDate||"-"],
+      ["業者名", 72, r=>(r.vendorName||"-").slice(0,10)],
+      ["搬入口", 68, r=>(r.entrance||"-").slice(0,10)],
+      ["品目",  66, r=>(r.items||"-").slice(0,11)],
       ["ステータス",50, r=>r.status||"予約中"],
     ];
     const totalW=stageW+tblW;
@@ -1677,7 +1719,7 @@ async function saveImage(){
     const DEF_DY=-52/(imgRect.ih*imgRect.sc);
     arr.forEach((res,idx)=>{
       if(res.markerX==null||res.markerY==null) return;
-      const color=vColor(res.vendorName||"その他");
+      const color=resColor(res);
       const isSel=res.id===selId;
       const _a=imgRatioToCanvasPx(res.markerX,res.markerY);
       const ax=_a.x*scale, ay=_a.y*scale;
@@ -1757,15 +1799,20 @@ async function saveImage(){
       const stColors={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
       tCols.forEach(([,w,getter],ci)=>{
         const cellTxt=getter(r,i);
-        octx.fillStyle=ci===4?(stColors[cellTxt]||"#64748b"):"#0f172a";
+        octx.fillStyle=ci===5?(stColors[cellTxt]||"#64748b"):ci===3?(eColor(r.entrance)||"#0f172a"):"#0f172a";
         octx.textAlign="left"; octx.textBaseline="middle";
         octx.font=`${9*scale}px system-ui,sans-serif`;
-        // vendor dot for vendor column
         if(ci===2){
           octx.beginPath(); octx.arc(tx+(cx3+5)*scale,(ry+tRowH/2)*scale,4*scale,0,Math.PI*2);
           octx.fillStyle=vColor(r.vendorName||""); octx.fill();
           octx.fillStyle="#0f172a"; octx.textAlign="left"; octx.textBaseline="middle";
           octx.font=`${9*scale}px system-ui,sans-serif`;
+          octx.fillText(cellTxt,tx+(cx3+12)*scale,(ry+tRowH/2)*scale);
+        } else if(ci===3){
+          octx.beginPath(); octx.arc(tx+(cx3+5)*scale,(ry+tRowH/2)*scale,4*scale,0,Math.PI*2);
+          octx.fillStyle=eColor(r.entrance)||"#94a3b8"; octx.fill();
+          octx.fillStyle=eColor(r.entrance)||"#0f172a";
+          octx.font=`bold ${9*scale}px system-ui,sans-serif`;
           octx.fillText(cellTxt,tx+(cx3+12)*scale,(ry+tRowH/2)*scale);
         } else {
           octx.fillText(cellTxt,tx+(cx3+2)*scale,(ry+tRowH/2)*scale);
