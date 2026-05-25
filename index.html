@@ -755,7 +755,7 @@ function resizeStage(){
   }
   stageW=cssW; stageH=cssH;
   const _bs=Math.min(1,Math.min(stageW,stageH)/480);
-  BW=Math.max(100,Math.round(172*_bs)); BH=Math.max(44,Math.round(60*_bs));
+  BW=Math.max(110,Math.round(172*_bs)); BH=Math.max(60,Math.round(76*_bs));
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
   bgCanvas.style.width=cssW+"px"; bgCanvas.style.height=cssH+"px";
   overlay.style.width=cssW+"px"; overlay.style.height=cssH+"px";
@@ -1091,22 +1091,23 @@ function redrawOverlay(){
     bg2.appendChild(mk("rect",{x:2,y:2,width:BW,height:BH,rx:11,fill:"rgba(0,0,0,0.07)"}));
     bg2.appendChild(mk("rect",{x:0,y:0,width:BW,height:BH,rx:11,fill:"white",stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
     bg2.appendChild(mk("rect",{x:0,y:0,width:5,height:BH,rx:3,fill:color}));
-    const t1=mk("text",{x:12,y:19,"font-size":"11","font-weight":"800",fill:"#0f172a"});
-    const vt=(res.vendorName||"").length>17?(res.vendorName||"").slice(0,17)+"…":(res.vendorName||"");
-    t1.textContent=`${idx+1}. ${vt}`; bg2.appendChild(t1);
-    const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
-    t2.textContent=res.deliveryDate||"日付未設定"; bg2.appendChild(t2);
-    const t3=mk("text",{x:12,y:45,"font-size":"10",fill:"#6b7280"});
-    const t3time=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):"";
-    const t3ent=res.entrance?("🚪"+(res.entrance).slice(0,10)):"";
-    t3.textContent=t3time&&t3ent?`${t3time} ${t3ent}`:t3time||t3ent||(res.items||"").slice(0,20);
-    bg2.appendChild(t3);
     const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
     const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
     const st=res.status||"予約中";
-    bg2.appendChild(mk("rect",{x:BW-56,y:4,width:52,height:16,rx:8,fill:sb2[st]||"#f1f5f9"}));
-    const st2=mk("text",{x:BW-30,y:15,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:sc2[st]||"#64748b"});
+    bg2.appendChild(mk("rect",{x:BW-56,y:3,width:52,height:13,rx:6,fill:sb2[st]||"#f1f5f9"}));
+    const st2=mk("text",{x:BW-30,y:11,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:sc2[st]||"#64748b"});
     st2.textContent=st; bg2.appendChild(st2);
+    const t1=mk("text",{x:12,y:21,"font-size":"11","font-weight":"800",fill:"#0f172a"});
+    const vt=(res.vendorName||"").length>14?(res.vendorName||"").slice(0,14)+"…":(res.vendorName||"");
+    t1.textContent=`${idx+1}. ${vt}`; bg2.appendChild(t1);
+    const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
+    t2.textContent=res.deliveryDate||"日付未設定"; bg2.appendChild(t2);
+    const t3=mk("text",{x:12,y:43,"font-size":"10",fill:color});
+    t3.textContent="🚪 "+(res.entrance||"未設定"); bg2.appendChild(t3);
+    const t4=mk("text",{x:12,y:54,"font-size":"10",fill:"#475569"});
+    t4.textContent="📍 "+((res.floor||"").slice(0,18)||"−"); bg2.appendChild(t4);
+    const t5=mk("text",{x:12,y:65,"font-size":"10",fill:"#6b7280"});
+    t5.textContent="📦 "+((res.items||"").slice(0,18)||"−"); bg2.appendChild(t5);
     g.appendChild(bg2);
     overlay.appendChild(g);
   });
@@ -1245,19 +1246,33 @@ function renderTable(){
         .some(v=>String(v||"").toLowerCase().includes(sq));
     });
   }
-  arr.sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
+  arr.sort((a,b)=>{
+    const ea=a.entrance||"", eb=b.entrance||"";
+    if(ea!==eb) return ea.localeCompare(eb,"ja");
+    return (a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+  });
   if(!arr.length){ tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--muted)">予約はありません</td></tr>`; return; }
   // 本日/明日判定
   const today=new Date().toISOString().slice(0,10);
   const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
-  tbody.innerHTML=arr.map((r,i)=>{
+  let rowNum=0, lastEntrance=null;
+  const rows=[];
+  arr.forEach(r=>{
+    const ent=r.entrance||"";
+    if(ent!==lastEntrance){
+      lastEntrance=ent;
+      const gc=resColor(r);
+      const gcnt=arr.filter(x=>(x.entrance||"")===ent).length;
+      rows.push(`<tr><td colspan="11" style="padding:5px 12px;font-size:12px;font-weight:700;color:${gc};background:${gc}18;border-bottom:2px solid ${gc}40">🚪 ${esc(ent||"搬入口未設定")}　<span style="font-weight:400;color:var(--muted)">${gcnt}件</span></td></tr>`);
+    }
+    rowNum++;
     const isT=r.deliveryDate===today, isTm=r.deliveryDate===tomorrow;
     const isPast=r.deliveryDate&&r.deliveryDate<today&&(r.status||"予約中")==="予約中";
     const rowCls=isT?"row-today":isTm?"row-tomorrow":isPast?"row-past":"";
     const dateBadge=isT?'<span class="badge-today">今日</span>':isTm?'<span class="badge-tomorrow">明日</span>':"";
     const entColor=resColor(r);
-    return `<tr class="${rowCls}">
-    <td style="font-weight:700;color:var(--muted)">${i+1}</td>
+    rows.push(`<tr class="${rowCls}">
+    <td style="font-weight:700;color:var(--muted)">${rowNum}</td>
     <td style="font-weight:700;white-space:nowrap">${esc(r.deliveryDate||"-")}${dateBadge}</td>
     <td style="white-space:nowrap;font-size:12px">${esc(r.timeStart||"-")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}</td>
     <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
@@ -1272,7 +1287,9 @@ function renderTable(){
       <button class="btn" style="padding:5px 9px;font-size:12px" onclick="openEditForm('${r.id}')">✏</button>
       <button class="btn btn-danger" style="padding:5px 9px;font-size:12px" onclick="confirmDel('${r.id}')">🗑</button>
     </div></td>
-  </tr>`}).join("");
+  </tr>`);
+  });
+  tbody.innerHTML=rows.join("");
 }
 
 function updateStats(){
@@ -1745,19 +1762,19 @@ async function saveImage(){
       const st=res.status||"予約中";
       const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
       const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
-      octx.fillStyle=sb2[st]||"#f1f5f9"; roundRect(octx,bx+(BW-56)*scale,by+4*scale,52*scale,16*scale,8*scale); octx.fill();
+      octx.fillStyle=sb2[st]||"#f1f5f9"; roundRect(octx,bx+(BW-56)*scale,by+3*scale,52*scale,13*scale,6*scale); octx.fill();
       octx.fillStyle=sc2[st]||"#64748b"; octx.textAlign="center"; octx.textBaseline="middle";
       octx.font=`bold ${9*scale}px system-ui,sans-serif`;
-      octx.fillText(st,bx+(BW-30)*scale,by+12*scale);
-      octx.fillStyle="#0f172a"; octx.textAlign="left"; octx.textBaseline="alphabetic";
+      octx.fillText(st,bx+(BW-30)*scale,by+10*scale);
+      octx.textAlign="left"; octx.textBaseline="alphabetic";
       octx.font=`bold ${11*scale}px system-ui,sans-serif`;
-      const vt=(res.vendorName||"").length>17?(res.vendorName||"").slice(0,17)+"…":(res.vendorName||"");
-      octx.fillText(`${idx+1}. ${vt}`,bx+12*scale,by+19*scale);
-      octx.fillStyle="#374151"; octx.font=`${10*scale}px system-ui,sans-serif`;
-      octx.fillText(res.deliveryDate||"日付未設定",bx+12*scale,by+32*scale);
-      octx.fillStyle="#6b7280";
-      const t3txt=res.timeStart?(res.timeStart+(res.timeEnd?"〜"+res.timeEnd:"")):(res.items||"").slice(0,20);
-      octx.fillText(t3txt,bx+12*scale,by+45*scale);
+      const vt=(res.vendorName||"").length>14?(res.vendorName||"").slice(0,14)+"…":(res.vendorName||"");
+      octx.fillStyle="#0f172a"; octx.fillText(`${idx+1}. ${vt}`,bx+12*scale,by+21*scale);
+      octx.font=`${10*scale}px system-ui,sans-serif`;
+      octx.fillStyle="#374151"; octx.fillText(res.deliveryDate||"日付未設定",bx+12*scale,by+32*scale);
+      octx.fillStyle=color; octx.fillText("🚪 "+(res.entrance||"未設定"),bx+12*scale,by+43*scale);
+      octx.fillStyle="#475569"; octx.fillText("📍 "+((res.floor||"").slice(0,18)||"−"),bx+12*scale,by+54*scale);
+      octx.fillStyle="#6b7280"; octx.fillText("📦 "+((res.items||"").slice(0,18)||"−"),bx+12*scale,by+65*scale);
     });
     // floor plan footer label
     const pageLabel=pdfDoc?`P.${curPage}/${pageCount}`:"";
