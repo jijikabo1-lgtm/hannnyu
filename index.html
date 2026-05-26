@@ -341,17 +341,8 @@
             <button class="fs-btn" id="btnFs">⛶ 全画面</button>
             <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
           </div>
-          <div style="margin-top:10px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <strong style="font-size:13px">このページの予約</strong>
-              <span id="mapCnt" style="font-size:12px;color:var(--muted)">0件</span>
-            </div>
-            <div style="border:1px solid var(--border);border-radius:10px;max-height:200px;overflow-y:auto" id="mapList">
-              <div class="mitem" style="cursor:default;color:var(--muted);font-size:13px">
-                図面をクリックして予約を追加してください
-              </div>
-            </div>
-          </div>
+          <span id="mapCnt" style="display:none"></span>
+          <div id="mapList" style="display:none"></div>
         </div>
 
         <!-- RIGHT: all reservations table -->
