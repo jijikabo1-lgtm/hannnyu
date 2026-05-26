@@ -1338,7 +1338,11 @@ function updateDatalists(){
 }
 function updateMapSideTable(){
   const tbody=$("mapSideTbody"), cnt=$("mapSideCnt");
-  const arr=[...reservations].sort((a,b)=>(a.deliveryDate||"").localeCompare(b.deliveryDate||""));
+  const arr=[...reservations].sort((a,b)=>{
+    const ea=a.entrance||"", eb=b.entrance||"";
+    if(ea!==eb) return ea.localeCompare(eb,"ja");
+    return (a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+  });
   cnt.textContent=arr.length+"件";
   if(!arr.length){
     tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">予約はありません</td></tr>`;
@@ -1346,11 +1350,20 @@ function updateMapSideTable(){
   }
   const today=new Date().toISOString().slice(0,10);
   const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
-  tbody.innerHTML=arr.map(r=>{
+  let lastEnt=null;
+  const rows=[];
+  arr.forEach(r=>{
+    const ent=r.entrance||"";
+    if(ent!==lastEnt){
+      lastEnt=ent;
+      const gc=resColor(r);
+      const gcnt=arr.filter(x=>(x.entrance||"")===ent).length;
+      rows.push(`<tr><td colspan="6" style="padding:4px 8px;font-size:11px;font-weight:700;color:${gc};background:${gc}18;border-bottom:2px solid ${gc}40">🚪 ${esc(ent||"搬入口未設定")} <span style="font-weight:400;color:var(--muted)">${gcnt}件</span></td></tr>`);
+    }
     const isT=r.deliveryDate===today, isTm=r.deliveryDate===tomorrow;
     const rowCls=isT?"row-today":isTm?"row-tomorrow":"";
     const ec=resColor(r);
-    return `<tr class="${rowCls}">
+    rows.push(`<tr class="${rowCls}">
       <td style="white-space:nowrap;font-weight:700">${esc(r.deliveryDate||"-")}</td>
       <td style="font-weight:700"><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${vColor(r.vendorName||"")};flex-shrink:0"></span>${esc(r.vendorName||"-")}</span></td>
       <td style="font-size:11px;font-weight:700;color:${ec}">${esc(r.entrance||"-")}</td>
@@ -1360,8 +1373,9 @@ function updateMapSideTable(){
         <button class="btn" style="padding:3px 6px;font-size:11px" title="図面で確認" onclick="jumpToMarker('${r.id}')">📍</button>
         <button class="btn" style="padding:3px 6px;font-size:11px" onclick="openEditForm('${r.id}')">✏</button>
       </div></td>
-    </tr>`;
-  }).join("");
+    </tr>`);
+  });
+  tbody.innerHTML=rows.join("");
 }
 
 function onDataUpdate(){
