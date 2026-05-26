@@ -1772,25 +1772,23 @@ $("formSave").addEventListener("click",async()=>{
   if(!items){ toast("搬入品目を入力してください"); $("fItems").focus(); return; }
   if(!entrance){ toast("搬入口を入力してください"); $("fEntrance").focus(); return; }
 
-  // ── 重複予約チェック ──
-  const ts=$("fTs").value, te=$("fTe").value, fl=$("fFloor").value.trim();
-  if(ts && fl){
+  // ── 重複予約チェック（搬入口ベース） ──
+  const ts=$("fTs").value, te=$("fTe").value;
+  if(ts && entrance){
     const conflicts=reservations.filter(r=>{
       if(editingId && r.id===editingId) return false; // 編集中の自分自身は除外
       if((r.status||"予約中")==="キャンセル") return false;
       if(r.deliveryDate!==deliveryDate) return false;
-      if(!r.floor || !r.timeStart) return false;
-      // フロア名が部分一致するかチェック（"1F"と"1F玄関"も検知）
-      const sameFloor = r.floor===fl || r.floor.includes(fl) || fl.includes(r.floor);
-      if(!sameFloor) return false;
+      if(!r.entrance || !r.timeStart) return false;
+      if(r.entrance!==entrance) return false;
       // 時間帯重複チェック
       const ts2=r.timeStart, te2=r.timeEnd||r.timeStart;
       const myEnd=te||ts;
       return !(myEnd<ts2 || te2<ts);
     });
     if(conflicts.length){
-      const list=conflicts.map(c=>`・${c.vendorName} (${c.timeStart}${c.timeEnd?"〜"+c.timeEnd:""}) ${c.floor}`).join("\n");
-      const ok=confirm(`⚠️ 同じ日時・場所に重複予約があります:\n\n${list}\n\nこのまま登録しますか？`);
+      const list=conflicts.map(c=>`・${c.vendorName} (${c.timeStart}${c.timeEnd?"〜"+c.timeEnd:""}) ${c.entrance}`).join("\n");
+      const ok=confirm(`⚠️ 同じ搬入口・日時に重複予約があります:\n\n${list}\n\nこのまま登録しますか？`);
       if(!ok){ return; }
     }
   }
