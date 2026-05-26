@@ -1600,10 +1600,9 @@ function renderTable(){
     <td style="font-size:12px;max-width:160px">${esc((r.items||"-").slice(0,50))}</td>
     <td style="font-size:12px">${esc(r.vehicleType||"-")}</td>
     <td><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span></td>
-    <td><div style="display:flex;gap:4px;flex-wrap:nowrap">
-      <button class="btn" style="padding:5px 9px;font-size:12px" title="図面で確認" onclick="jumpToMarker('${r.id}')">📍</button>
-      <button class="btn" style="padding:5px 9px;font-size:12px" onclick="openEditForm('${r.id}')">✏</button>
-      <button class="btn btn-danger" style="padding:5px 9px;font-size:12px" onclick="confirmDel('${r.id}')">🗑</button>
+    <td><div style="display:flex;gap:6px;flex-wrap:nowrap">
+      <button class="btn" style="padding:5px 12px;font-size:12px;font-weight:700" onclick="openEditForm('${r.id}')">編集</button>
+      <button class="btn btn-danger" style="padding:5px 12px;font-size:12px;font-weight:700" onclick="confirmDel('${r.id}')">削除</button>
     </div></td>
   </tr>`);
   });
@@ -1687,10 +1686,7 @@ function updateMapSideTable(){
       <td style="font-size:11px;font-weight:700;color:${ec}">${esc(r.entrance||"-")}</td>
       <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc((r.items||"-").slice(0,25))}</td>
       <td><span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span></td>
-      <td><div style="display:flex;gap:3px">
-        <button class="btn" style="padding:3px 6px;font-size:11px" title="図面で確認" onclick="jumpToMarker('${r.id}')">📍</button>
-        <button class="btn" style="padding:3px 6px;font-size:11px" onclick="openEditForm('${r.id}')">✏</button>
-      </div></td>
+      <td><button class="btn" style="padding:4px 10px;font-size:11px;font-weight:700" onclick="openEditForm('${r.id}')">編集</button></td>
     </tr>`);
   });
   tbody.innerHTML=rows.join("");
