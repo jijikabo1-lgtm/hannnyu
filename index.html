@@ -800,8 +800,8 @@
         <div class="field"><label>担当者名</label><input type="text" id="fContact" list="contactOpts" placeholder="例：山田 太郎" /><datalist id="contactOpts"></datalist></div>
         <div class="field"><label>連絡先電話番号</label><input type="tel" id="fPhone" placeholder="例：090-0000-0000" /></div>
         <div class="field"><label>搬入日 <span class="req">*</span></label><input type="date" id="fDate" /></div>
-        <div class="field"><label>開始時刻</label><input type="time" id="fTs" /></div>
-        <div class="field"><label>終了時刻（予定）</label><input type="time" id="fTe" /></div>
+        <div class="field"><label>開始時刻</label><select id="fTs"><option value="">-- 選択 --</option></select></div>
+        <div class="field"><label>終了時刻（予定）</label><select id="fTe"><option value="">-- 選択 --</option></select></div>
         <div class="field"><label>フロア / 搬入場所</label><input type="text" id="fFloor" list="floorOpts" placeholder="例：1F 玄関ホール" /><datalist id="floorOpts"></datalist></div>
         <div class="field"><label>🚪 搬入口 <span class="req">*</span></label><input type="text" id="fEntrance" list="entranceOpts" placeholder="例：北側搬入口、南口、A搬入口…" /><datalist id="entranceOpts"></datalist></div>
         <div class="field"><label>車両種別</label>
@@ -1756,6 +1756,22 @@ function openEditForm(id){
   $("formModal").classList.add("open");
 }
 window.openEditForm=openEditForm;
+
+// ── 時刻セレクト初期化（7:00〜21:00、15分刻み） ──
+(function buildTimeSelects(){
+  const slots=[];
+  for(let h=7;h<=21;h++){
+    for(let m=0;m<60;m+=15){
+      if(h===21&&m>0) break;
+      slots.push(`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`);
+    }
+  }
+  ["fTs","fTe"].forEach(id=>{
+    const sel=$(id);
+    slots.forEach(t=>{ const o=document.createElement("option"); o.value=o.textContent=t; sel.appendChild(o); });
+  });
+})();
+
 function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fTs","fTe","fFloor","fEntrance","fItems","fNotes"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
 function closeForm(){ $("formModal").classList.remove("open"); editingId=null; pendingMx=pendingMy=null; }
 $("formClose").addEventListener("click",closeForm);
