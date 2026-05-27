@@ -800,8 +800,20 @@
         <div class="field"><label>担当者名</label><input type="text" id="fContact" list="contactOpts" placeholder="例：山田 太郎" /><datalist id="contactOpts"></datalist></div>
         <div class="field"><label>連絡先電話番号</label><input type="tel" id="fPhone" placeholder="例：090-0000-0000" /></div>
         <div class="field"><label>搬入日 <span class="req">*</span></label><input type="date" id="fDate" /></div>
-        <div class="field"><label>開始時刻</label><select id="fTs"><option value="">-- 選択 --</option><option value="07:00">07:00</option><option value="07:15">07:15</option><option value="07:30">07:30</option><option value="07:45">07:45</option><option value="08:00">08:00</option><option value="08:15">08:15</option><option value="08:30">08:30</option><option value="08:45">08:45</option><option value="09:00">09:00</option><option value="09:15">09:15</option><option value="09:30">09:30</option><option value="09:45">09:45</option><option value="10:00">10:00</option><option value="10:15">10:15</option><option value="10:30">10:30</option><option value="10:45">10:45</option><option value="11:00">11:00</option><option value="11:15">11:15</option><option value="11:30">11:30</option><option value="11:45">11:45</option><option value="12:00">12:00</option><option value="12:15">12:15</option><option value="12:30">12:30</option><option value="12:45">12:45</option><option value="13:00">13:00</option><option value="13:15">13:15</option><option value="13:30">13:30</option><option value="13:45">13:45</option><option value="14:00">14:00</option><option value="14:15">14:15</option><option value="14:30">14:30</option><option value="14:45">14:45</option><option value="15:00">15:00</option><option value="15:15">15:15</option><option value="15:30">15:30</option><option value="15:45">15:45</option><option value="16:00">16:00</option><option value="16:15">16:15</option><option value="16:30">16:30</option><option value="16:45">16:45</option><option value="17:00">17:00</option><option value="17:15">17:15</option><option value="17:30">17:30</option><option value="17:45">17:45</option><option value="18:00">18:00</option><option value="18:15">18:15</option><option value="18:30">18:30</option><option value="18:45">18:45</option><option value="19:00">19:00</option><option value="19:15">19:15</option><option value="19:30">19:30</option><option value="19:45">19:45</option><option value="20:00">20:00</option><option value="20:15">20:15</option><option value="20:30">20:30</option><option value="20:45">20:45</option><option value="21:00">21:00</option></select></div>
-        <div class="field"><label>終了時刻（予定）</label><select id="fTe"><option value="">-- 選択 --</option><option value="07:00">07:00</option><option value="07:15">07:15</option><option value="07:30">07:30</option><option value="07:45">07:45</option><option value="08:00">08:00</option><option value="08:15">08:15</option><option value="08:30">08:30</option><option value="08:45">08:45</option><option value="09:00">09:00</option><option value="09:15">09:15</option><option value="09:30">09:30</option><option value="09:45">09:45</option><option value="10:00">10:00</option><option value="10:15">10:15</option><option value="10:30">10:30</option><option value="10:45">10:45</option><option value="11:00">11:00</option><option value="11:15">11:15</option><option value="11:30">11:30</option><option value="11:45">11:45</option><option value="12:00">12:00</option><option value="12:15">12:15</option><option value="12:30">12:30</option><option value="12:45">12:45</option><option value="13:00">13:00</option><option value="13:15">13:15</option><option value="13:30">13:30</option><option value="13:45">13:45</option><option value="14:00">14:00</option><option value="14:15">14:15</option><option value="14:30">14:30</option><option value="14:45">14:45</option><option value="15:00">15:00</option><option value="15:15">15:15</option><option value="15:30">15:30</option><option value="15:45">15:45</option><option value="16:00">16:00</option><option value="16:15">16:15</option><option value="16:30">16:30</option><option value="16:45">16:45</option><option value="17:00">17:00</option><option value="17:15">17:15</option><option value="17:30">17:30</option><option value="17:45">17:45</option><option value="18:00">18:00</option><option value="18:15">18:15</option><option value="18:30">18:30</option><option value="18:45">18:45</option><option value="19:00">19:00</option><option value="19:15">19:15</option><option value="19:30">19:30</option><option value="19:45">19:45</option><option value="20:00">20:00</option><option value="20:15">20:15</option><option value="20:30">20:30</option><option value="20:45">20:45</option><option value="21:00">21:00</option></select></div>
+        <div class="field"><label>開始時刻</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="fTsH" style="flex:1"><option value="">時</option><option value="00">00</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option></select>
+            <span style="font-weight:700;color:var(--muted)">:</span>
+            <select id="fTsM" style="flex:1"><option value="">分</option><option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select>
+          </div>
+        </div>
+        <div class="field"><label>終了時刻（予定）</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="fTeH" style="flex:1"><option value="">時</option><option value="00">00</option><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option></select>
+            <span style="font-weight:700;color:var(--muted)">:</span>
+            <select id="fTeM" style="flex:1"><option value="">分</option><option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select>
+          </div>
+        </div>
         <div class="field"><label>フロア / 搬入場所</label><input type="text" id="fFloor" list="floorOpts" placeholder="例：1F 玄関ホール" /><datalist id="floorOpts"></datalist></div>
         <div class="field"><label>🚪 搬入口 <span class="req">*</span></label><input type="text" id="fEntrance" list="entranceOpts" placeholder="例：北側搬入口、南口、A搬入口…" /><datalist id="entranceOpts"></datalist></div>
         <div class="field"><label>車両種別</label>
@@ -1743,13 +1755,32 @@ function openNewForm(canX,canY){
   $("fPage").value=curPage; $("statusField").style.display="none";
   $("formModal").classList.add("open");
 }
+// ── 時刻ヘルパー（HH:MM ⇔ 時/分セレクト） ──
+function getTimeVal(hId, mId){
+  const h=$(hId).value, m=$(mId).value;
+  if(!h || !m) return "";
+  return h+":"+m;
+}
+function setTimeVal(hId, mId, val){
+  if(val && /^\d{1,2}:\d{2}$/.test(val)){
+    const [h,m]=val.split(":");
+    $(hId).value=h.padStart(2,"0");
+    // 15分刻みでない既存データは最も近い15分に丸める
+    const mi=parseInt(m,10);
+    const snapped=String(Math.round(mi/15)*15%60).padStart(2,"0");
+    $(mId).value=["00","15","30","45"].includes(snapped)?snapped:"00";
+  } else {
+    $(hId).value=""; $(mId).value="";
+  }
+}
+
 function openEditForm(id){
   const r=reservations.find(x=>x.id===id); if(!r) return;
   editingId=id; pendingMx=null; pendingMy=null;
   $("formTitle").textContent="✏️ 予約を編集";
   $("fId").value=id; $("fVendor").value=r.vendorName||""; $("fContact").value=r.contactPerson||"";
   $("fPhone").value=r.phone||""; $("fDate").value=r.deliveryDate||"";
-  $("fTs").value=r.timeStart||""; $("fTe").value=r.timeEnd||"";
+  setTimeVal("fTsH","fTsM",r.timeStart||""); setTimeVal("fTeH","fTeM",r.timeEnd||"");
   $("fFloor").value=r.floor||""; $("fEntrance").value=r.entrance||""; $("fVehicle").value=r.vehicleType||"";
   $("fItems").value=r.items||""; $("fNotes").value=r.notes||"";
   $("fStatus").value=r.status||"予約中"; $("statusField").style.display="block";
@@ -1757,7 +1788,7 @@ function openEditForm(id){
 }
 window.openEditForm=openEditForm;
 
-function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fTs","fTe","fFloor","fEntrance","fItems","fNotes"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
+function clearForm(){ ["fId","fVendor","fContact","fPhone","fDate","fFloor","fEntrance","fItems","fNotes"].forEach(id=>$(id).value=""); ["fTsH","fTsM","fTeH","fTeM"].forEach(id=>$(id).value=""); $("fVehicle").value=""; $("fStatus").value="予約中"; }
 function closeForm(){ $("formModal").classList.remove("open"); editingId=null; pendingMx=pendingMy=null; }
 $("formClose").addEventListener("click",closeForm);
 $("formCancel").addEventListener("click",closeForm);
@@ -1774,7 +1805,7 @@ $("formSave").addEventListener("click",async()=>{
   if(!entrance){ toast("搬入口を入力してください"); $("fEntrance").focus(); return; }
 
   // ── 重複予約チェック（搬入口ベース） ──
-  const ts=$("fTs").value, te=$("fTe").value;
+  const ts=getTimeVal("fTsH","fTsM"), te=getTimeVal("fTeH","fTeM");
   if(ts && entrance){
     const conflicts=reservations.filter(r=>{
       if(editingId && r.id===editingId) return false; // 編集中の自分自身は除外
@@ -1811,7 +1842,7 @@ $("formSave").addEventListener("click",async()=>{
   }
   const data={
     vendorName, contactPerson:$("fContact").value.trim(), phone:$("fPhone").value.trim(),
-    deliveryDate, timeStart:$("fTs").value, timeEnd:$("fTe").value,
+    deliveryDate, timeStart:ts, timeEnd:te,
     floor:$("fFloor").value.trim(), entrance, vehicleType:$("fVehicle").value,
     items, notes:$("fNotes").value.trim(),
     status:$("fStatus").value||"予約中",
