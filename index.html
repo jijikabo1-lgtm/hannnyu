@@ -469,10 +469,11 @@
     .hdr-actions{display:inline-flex;gap:8px;align-items:center}
     .hdr-icon-btn{
       background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
-      color:#fff;border-radius:10px;width:36px;height:36px;cursor:pointer;
-      font-size:16px;display:inline-flex;align-items:center;justify-content:center;
-      transition:all var(--t-fast);
+      color:#fff;border-radius:10px;min-width:36px;height:36px;padding:0 12px;cursor:pointer;
+      font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      transition:all var(--t-fast);white-space:nowrap;
     }
+    .hdr-icon-btn.icon-only{width:36px;padding:0;font-size:16px}
     .hdr-icon-btn:hover{background:rgba(255,255,255,.14);transform:translateY(-1px)}
     .hdr-icon-btn:active{transform:translateY(0)}
 
@@ -644,8 +645,8 @@
     <span id="connLbl">接続中…</span>
   </div>
   <div class="hdr-actions">
-    <button class="hdr-icon-btn" id="btnHdrPdf" title="図面PDFをアップロード">📄</button>
-    <button class="hdr-icon-btn" id="btnHdrMenu" title="メニュー">☰</button>
+    <button class="hdr-icon-btn" id="btnHdrPdf" title="図面PDFをアップロード">PDFアップロード</button>
+    <button class="hdr-icon-btn icon-only" id="btnHdrMenu" title="メニュー">☰</button>
   </div>
   <input id="pdfInput" type="file" accept="application/pdf" style="display:none" />
 </header>
@@ -714,7 +715,7 @@
               <button id="btnRotL" title="左90°回転">↺</button>
               <button id="btnRotR" title="右90°回転">↻</button>
               <span class="stage-ctrl-sep"></span>
-              <button id="btnSaveImg" title="図面と一覧を画像保存">💾</button>
+              <button id="btnSaveImg" title="図面と一覧を画像保存">画像保存</button>
               <button class="fs-btn" id="btnFs" title="全画面表示">⛶</button>
             </div>
             <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
