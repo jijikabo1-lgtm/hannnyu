@@ -646,23 +646,11 @@
   </div>
   <div class="hdr-actions">
     <button class="hdr-icon-btn" id="btnHdrPdf" title="図面PDFをアップロード">PDFアップロード</button>
-    <button class="hdr-icon-btn icon-only" id="btnHdrMenu" title="メニュー">☰</button>
+    <button class="hdr-icon-btn" id="btnHdrLogout" title="ログアウト">ログアウト</button>
   </div>
   <input id="pdfInput" type="file" accept="application/pdf" style="display:none" />
 </header>
 
-<!-- ════ HEADER DROPDOWN MENU ════ -->
-<div class="hdr-menu" id="hdrMenu">
-  <button class="hdr-menu-item" id="btnMenuPdf">
-    <span class="hdr-menu-icon">📄</span>
-    <span><strong>図面PDFをアップロード</strong><br><span class="hdr-menu-sub">現在の現場に図面を登録</span></span>
-  </button>
-  <div class="hdr-menu-divider"></div>
-  <button class="hdr-menu-item" id="btnLogout">
-    <span class="hdr-menu-icon">🔒</span>
-    <span><strong>ログアウト</strong><br><span class="hdr-menu-sub">パスワード再入力が必要</span></span>
-  </button>
-</div>
 
 <!-- ════ TABS ════ -->
 <div class="tabs">
@@ -1018,27 +1006,17 @@ function toast(msg, dur=4000){
   clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none"},dur);
 }
 
-// ログアウト
-$("btnLogout").addEventListener("click",()=>{
+// ── ヘッダー：PDFアップロード ──
+$("btnHdrPdf").addEventListener("click",()=>$("pdfInput").click());
+
+// ── ヘッダー：ログアウト ──
+$("btnHdrLogout").addEventListener("click",()=>{
   if(confirm("ログアウトしますか？")){
     sessionStorage.removeItem(PW_KEY);
     sessionStorage.removeItem("currentSiteId");
     location.reload();
   }
 });
-
-// ── ヘッダーメニュー（PDFアップロード／ログアウト） ──
-function closeHdrMenu(){ $("hdrMenu").classList.remove("show"); }
-$("btnHdrMenu").addEventListener("click",e=>{
-  e.stopPropagation();
-  $("hdrMenu").classList.toggle("show");
-});
-$("btnHdrPdf").addEventListener("click",()=>$("pdfInput").click());
-$("btnMenuPdf").addEventListener("click",()=>{ closeHdrMenu(); $("pdfInput").click(); });
-document.addEventListener("click",e=>{
-  if(!e.target.closest("#hdrMenu") && !e.target.closest("#btnHdrMenu")) closeHdrMenu();
-});
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeHdrMenu(); });
 
 // ── Firebase / localStorage fallback ──
 let db=null, dbUnsub=null, usingFb=false;
@@ -2296,7 +2274,7 @@ async function saveImage(){
       toast("画像を保存しました 📷");
     },"image/png");
   }catch(e){ console.error(e); toast("保存エラー: "+e.message); }
-  finally{ btn.disabled=false; btn.textContent="💾 画像保存"; }
+  finally{ btn.disabled=false; btn.textContent="画像保存"; }
 }
 
 function roundRect(ctx,x,y,w,h,r){
