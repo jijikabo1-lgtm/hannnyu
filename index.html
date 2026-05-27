@@ -131,6 +131,55 @@
     }
     .pw-err.show{display:block}
 
+    /* ── Site picker (login screen) ── */
+    .site-card{
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);
+      border-radius:24px;padding:36px 32px;width:100%;max-width:460px;
+      box-shadow:0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+      display:none;flex-direction:column;gap:18px;max-height:90vh;
+    }
+    .site-card.show{display:flex}
+    .site-list{display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow-y:auto;padding:2px}
+    .site-list-item{
+      display:flex;align-items:center;gap:10px;padding:14px 16px;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;color:#fff;cursor:pointer;transition:all var(--t-fast);
+      text-align:left;font-size:15px;font-weight:600;
+    }
+    .site-list-item:hover{background:rgba(255,255,255,.10);border-color:rgba(165,180,252,.4);transform:translateX(2px)}
+    .site-list-item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .site-list-item .edit{
+      background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);color:#fff;
+      width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;
+    }
+    .site-list-item .edit:hover{background:rgba(165,180,252,.18)}
+    .site-empty{color:rgba(255,255,255,.55);text-align:center;padding:18px 8px;font-size:13px}
+    .site-add-row{display:flex;gap:8px}
+    .site-add-row input{
+      flex:1;padding:11px 14px;border-radius:10px;font-size:14px;
+      background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#fff;outline:none;
+    }
+    .site-add-row input:focus{border-color:#a5b4fc;box-shadow:0 0 0 3px rgba(165,180,252,.18)}
+    .site-add-row input::placeholder{color:rgba(255,255,255,.35)}
+    .site-add-row button{
+      padding:11px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:14px;
+      background:linear-gradient(135deg,#6366f1 0%,#4f46e5 100%);color:#fff;
+      box-shadow:0 4px 14px rgba(79,70,229,.4);transition:all var(--t-fast);
+    }
+    .site-add-row button:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(79,70,229,.55)}
+    .site-card-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:rgba(255,255,255,.45)}
+    .site-card-foot button{background:none;border:none;color:rgba(255,255,255,.55);cursor:pointer;font-size:12px;text-decoration:underline}
+    .site-card-foot button:hover{color:#fff}
+    .site-section-label{font-size:11px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-top:6px}
+
+    /* ── Header site display ── */
+    .hdr-site{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);border-radius:10px;color:#fff;font-size:13px;font-weight:600;max-width:240px}
+    .hdr-site-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+    .hdr-site-switch{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:0 8px;height:26px;cursor:pointer;font-size:13px;transition:all var(--t-fast)}
+    .hdr-site-switch:hover{background:rgba(255,255,255,.14)}
+    @media(max-width:640px){.hdr-site{max-width:160px;font-size:12px}.hdr-site-name{max-width:90px}}
+
     /* ── Header ── */
     .hdr{
       background:linear-gradient(180deg,rgba(11,18,32,.92) 0%,rgba(11,18,32,.86) 100%);
@@ -557,7 +606,7 @@
 
 <!-- ════ パスワード画面 ════ -->
 <div id="pwScreen">
-  <div class="pw-card">
+  <div class="pw-card" id="pwCard">
     <div class="pw-logo">🏗</div>
     <div class="pw-title">搬入予約システム</div>
     <div class="pw-sub">パスワードを入力してください</div>
@@ -565,15 +614,30 @@
     <div class="pw-err" id="pwErr">パスワードが違います</div>
     <button class="pw-btn" id="pwBtn">ログイン</button>
   </div>
+  <div class="site-card" id="siteCard">
+    <div class="pw-logo">🏗</div>
+    <div class="pw-title">現場を選んでください</div>
+    <div class="pw-sub">作業する現場を選択するか、新しい現場を追加してください</div>
+    <div class="site-section-label">既存の現場</div>
+    <div class="site-list" id="siteCardList"><div class="site-empty">読み込み中…</div></div>
+    <div class="site-section-label">新しい現場を追加</div>
+    <div class="site-add-row">
+      <input id="siteCardNewName" type="text" placeholder="例：〇〇ビル新築工事" />
+      <button id="siteCardAddBtn">追加</button>
+    </div>
+    <div class="site-card-foot">
+      <button id="siteCardLogout">ログアウト</button>
+    </div>
+  </div>
 </div>
 
 <!-- ════ HEADER ════ -->
 <header class="hdr">
   <div class="hdr-logo">🏗 搬入予約</div>
-  <div class="site-sel">
-    <select id="siteSelect" title="現場を選択"><option value="">現場を選択…</option></select>
-    <button class="site-btn" id="btnSiteAdd" title="現場を追加">＋</button>
-    <button class="site-btn" id="btnSiteEdit" title="現場名を変更・削除">✏</button>
+  <div class="hdr-site" id="hdrSiteWrap">
+    <span title="現在の現場">🏗</span>
+    <span class="hdr-site-name" id="hdrSiteName">—</span>
+    <button class="hdr-site-switch" id="btnSiteSwitch" title="現場を切り替え">切替</button>
   </div>
   <div class="conn" id="connWrap" title="同期状態">
     <div class="conn-dot" id="connDot"></div>
@@ -883,16 +947,31 @@
 const APP_PASSWORD = "hannnyu2024";
 // ══════════════════════════════════════════════════
 
-// ── パスワード認証 ──
+// ── パスワード認証 & 現場選択 ──
 const PW_KEY = "hannnyu_auth_v1";
 function checkAuth(){
   return sessionStorage.getItem(PW_KEY) === "ok";
+}
+// 現場選択カードを表示（パスワード認証後）
+function showSitePicker(){
+  document.getElementById("pwCard").style.display="none";
+  document.getElementById("siteCard").classList.add("show");
+  document.getElementById("pwScreen").classList.remove("hidden");
+}
+function hidePwScreen(){
+  document.getElementById("pwScreen").classList.add("hidden");
+}
+function showPwCard(){
+  document.getElementById("siteCard").classList.remove("show");
+  document.getElementById("pwCard").style.display="flex";
+  document.getElementById("pwScreen").classList.remove("hidden");
+  setTimeout(()=>{ const i=document.getElementById("pwInput"); if(i) i.focus(); },50);
 }
 function login(){
   const val = document.getElementById("pwInput").value;
   if(val === APP_PASSWORD){
     sessionStorage.setItem(PW_KEY,"ok");
-    document.getElementById("pwScreen").classList.add("hidden");
+    showSitePicker();
   } else {
     document.getElementById("pwErr").classList.add("show");
     document.getElementById("pwInput").value="";
@@ -902,7 +981,10 @@ function login(){
 }
 // 起動時チェック
 if(checkAuth()){
-  document.getElementById("pwScreen").classList.add("hidden");
+  // 保存済み現場があれば自動入場、なければ現場選択カード
+  const savedSite = sessionStorage.getItem("currentSiteId");
+  if(savedSite){ hidePwScreen(); }
+  else{ showSitePicker(); }
 }
 document.getElementById("pwBtn").addEventListener("click", login);
 document.getElementById("pwInput").addEventListener("keydown", e=>{ if(e.key==="Enter") login(); });
@@ -939,6 +1021,7 @@ function toast(msg, dur=4000){
 $("btnLogout").addEventListener("click",()=>{
   if(confirm("ログアウトしますか？")){
     sessionStorage.removeItem(PW_KEY);
+    sessionStorage.removeItem("currentSiteId");
     location.reload();
   }
 });
@@ -2249,18 +2332,48 @@ async function saveRotation(rot){
 }
 
 // ── 現場管理 ──
-function renderSiteSelect(){
-  const sel=$("siteSelect");
-  sel.innerHTML=sites.length===0
-    ? '<option value="">現場がありません</option>'
-    : sites.map(s=>`<option value="${s.id}"${s.id===currentSiteId?" selected":""}>${esc(s.name)}</option>`).join("");
+function renderHdrSite(){
+  const cur = sites.find(s=>s.id===currentSiteId);
+  $("hdrSiteName").textContent = cur ? cur.name : "—";
 }
+function renderSiteCardList(){
+  const list=$("siteCardList");
+  if(sites.length===0){
+    list.innerHTML='<div class="site-empty">現場がまだありません。<br>下のフォームから追加してください。</div>';
+    return;
+  }
+  list.innerHTML=sites.map(s=>`
+    <div class="site-list-item" data-id="${s.id}">
+      <span class="name">${esc(s.name)}</span>
+      <button class="edit" data-edit="${s.id}" title="編集・削除">✏</button>
+    </div>`).join("");
+  list.querySelectorAll(".site-list-item").forEach(el=>{
+    el.addEventListener("click", async(e)=>{
+      if(e.target.closest("[data-edit]")) return;
+      const id=el.getAttribute("data-id");
+      await selectSite(id);
+      hidePwScreen();
+    });
+  });
+  list.querySelectorAll("[data-edit]").forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const id=btn.getAttribute("data-edit");
+      // 編集対象として一時的にcurrentSiteIdを使う既存ロジックに合わせる
+      const prev=currentSiteId; currentSiteId=id;
+      showSiteModal(true);
+      // モーダルを閉じたときに元に戻すため保持
+      siteModalReturnTo=prev;
+    });
+  });
+}
+function renderSiteSelect(){ renderSiteCardList(); renderHdrSite(); }
 
 async function selectSite(id){
-  if(currentSiteId===id) return;
+  if(currentSiteId===id){ renderHdrSite(); return; }
   currentSiteId=id;
   sessionStorage.setItem("currentSiteId",id);
-  renderSiteSelect();
+  renderHdrSite();
   // PDFリセット
   if(pdfWatchUnsub){ pdfWatchUnsub(); pdfWatchUnsub=null; }
   pdfDoc=null; curPage=1; pageCount=0; normalRot=0;
@@ -2275,23 +2388,24 @@ async function selectSite(id){
 
 async function initSites(){
   if(!usingFb){
-    currentSiteId="local";
-    $("siteSelect").innerHTML='<option value="local">現場（ローカル）</option>';
+    currentSiteId="local"; sites=[{id:"local",name:"現場（ローカル）"}];
+    renderSiteSelect();
     reservations=lsLoad(); onDataUpdate(); return;
   }
   siteUnsub=db.collection("sites").orderBy("createdAt","asc").onSnapshot(async snap=>{
     sites=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderSiteSelect();
+    // セッション復帰時のみ自動選択（ログイン画面で選択されていない場合）
     if(!currentSiteId){
       const saved=sessionStorage.getItem("currentSiteId");
-      const target=sites.find(s=>s.id===saved)||sites[0];
+      const target=sites.find(s=>s.id===saved);
       if(target){ await selectSite(target.id); }
-      else{ showSiteModal(false); } // 現場ゼロ → 作成を促す
     }
   });
 }
 
 let siteEditId=null;
+let siteModalReturnTo=null;
 function showSiteModal(isEdit=false){
   siteEditId=isEdit?currentSiteId:null;
   $("siteModalTitle").textContent=isEdit?"✏️ 現場を編集":"🏗 現場を追加";
@@ -2300,14 +2414,41 @@ function showSiteModal(isEdit=false){
   $("siteModal").classList.add("open");
   setTimeout(()=>$("siteName").focus(),100);
 }
-function closeSiteModal(){ $("siteModal").classList.remove("open"); }
+function closeSiteModal(){
+  $("siteModal").classList.remove("open");
+  // 編集用に一時退避していたcurrentSiteIdを復元
+  if(siteModalReturnTo!==null){ currentSiteId=siteModalReturnTo; siteModalReturnTo=null; renderHdrSite(); }
+}
 $("siteModalClose").addEventListener("click",closeSiteModal);
 $("siteModalCancel").addEventListener("click",closeSiteModal);
 $("siteModal").addEventListener("click",e=>{ if(e.target===$("siteModal"))closeSiteModal(); });
 $("siteName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("siteModalSave").click(); });
-$("btnSiteAdd").addEventListener("click",()=>showSiteModal(false));
-$("btnSiteEdit").addEventListener("click",()=>{ if(currentSiteId) showSiteModal(true); else toast("現場を選択してください"); });
-$("siteSelect").addEventListener("change",async e=>{ if(e.target.value) await selectSite(e.target.value); });
+
+// ── ログイン画面：現場追加ボタン ──
+async function addSiteFromCard(){
+  const name=$("siteCardNewName").value.trim();
+  if(!name){ toast("現場名を入力してください"); $("siteCardNewName").focus(); return; }
+  if(!usingFb){ toast("オフラインモードでは追加できません"); return; }
+  const btn=$("siteCardAddBtn"); btn.disabled=true; const old=btn.textContent; btn.textContent="…";
+  try{
+    const ref=await db.collection("sites").add({name,pdfId:null,fileName:null,rotation:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    $("siteCardNewName").value="";
+    await selectSite(ref.id);
+    hidePwScreen();
+    toast(`「${name}」を追加しました ✅`);
+  }catch(e){ toast("エラー: "+e.message); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+$("siteCardAddBtn").addEventListener("click", addSiteFromCard);
+$("siteCardNewName").addEventListener("keydown", e=>{ if(e.key==="Enter") addSiteFromCard(); });
+$("siteCardLogout").addEventListener("click",()=>{
+  sessionStorage.removeItem(PW_KEY);
+  sessionStorage.removeItem("currentSiteId");
+  showPwCard();
+});
+
+// ── ヘッダー：現場切替ボタン ──
+$("btnSiteSwitch").addEventListener("click", showSitePicker);
 
 $("siteModalSave").addEventListener("click",async()=>{
   const name=$("siteName").value.trim();
@@ -2329,13 +2470,19 @@ $("siteModalSave").addEventListener("click",async()=>{
 });
 
 $("btnSiteDel").addEventListener("click",async()=>{
-  const site=sites.find(s=>s.id===currentSiteId);
+  const delId = siteEditId || currentSiteId;
+  const site=sites.find(s=>s.id===delId);
   if(!site||!confirm(`「${site.name}」を削除しますか？\nこの現場の予約データもすべて削除されます。`)) return;
   try{
-    const snap=await db.collection("reservations").where("siteId","==",currentSiteId).get();
+    const snap=await db.collection("reservations").where("siteId","==",delId).get();
     const batch=db.batch(); snap.docs.forEach(d=>batch.delete(d.ref)); await batch.commit();
-    await db.collection("sites").doc(currentSiteId).delete();
-    closeSiteModal(); currentSiteId=null; toast("現場を削除しました");
+    await db.collection("sites").doc(delId).delete();
+    // 削除した現場が現在の現場と同じなら解除し、ログイン画面に戻す
+    if(siteModalReturnTo===delId) siteModalReturnTo=null;
+    if(currentSiteId===delId){ currentSiteId=null; sessionStorage.removeItem("currentSiteId"); }
+    $("siteModal").classList.remove("open");
+    toast("現場を削除しました");
+    showSitePicker();
   }catch(e){ toast("削除エラー: "+e.message); }
 });
 
