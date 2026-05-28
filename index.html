@@ -574,7 +574,12 @@
     .map-side-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-2)}
     .map-side-table tr:last-child td{border-bottom:none}
     .map-side-scroll{max-height:calc(100vh - 280px);overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);background:#fff;box-shadow:var(--shadow-xs)}
-    @media(max-width:900px){.map-body-split{flex-direction:column}.map-list-col{border-left:none;border-top:1px solid var(--border)}}
+    @media(max-width:900px){
+      .map-body-split{flex-direction:column;align-items:stretch}
+      .map-stage-col{flex:none;width:100%}
+      .map-list-col{flex:none;width:100%;border-left:none;border-top:1px solid var(--border)}
+      .map-side-scroll{max-height:60vh}
+    }
 
     /* Print */
     @media print{
