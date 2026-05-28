@@ -1313,11 +1313,19 @@ async function loadPdfPage(n){
   const page=await pdfDoc.getPage(n);
   if(mySeq !== pdfLoadSeq) return;
   const vp1 = page.getViewport({scale:1, rotation:0});
-  const TARGET_DPI = 200;
+  // モバイル端末はcanvasの最大サイズ制限が厳しい（iOS Safari: 約1677万px / 1辺4096px）
+  // 制限を超えると描画が真っ白になるため、端末に応じて上限を切り替える
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+                || Math.min(window.screen.width, window.screen.height) < 768;
+  const TARGET_DPI = isMobile ? 150 : 200;
   const dpiScale   = TARGET_DPI / 72;
   const baseMax    = Math.max(vp1.width, vp1.height);
-  const MAX_LONG   = 10000;
-  const scale      = clamp(dpiScale, 0.5, MAX_LONG / baseMax);
+  const MAX_LONG   = isMobile ? 4096 : 10000;
+  const MAX_AREA   = isMobile ? 16000000 : Infinity; // 総ピクセル面積の上限
+  let   scale      = clamp(dpiScale, 0.5, MAX_LONG / baseMax);
+  // 面積上限も適用（縦横どちらも小さくないが面積が大きいケース対策）
+  const areaScale  = Math.sqrt(MAX_AREA / (vp1.width * vp1.height));
+  if(scale > areaScale) scale = Math.max(0.5, areaScale);
   const vp = page.getViewport({scale, rotation:0});
   const tmp=document.createElement("canvas");
   tmp.width  = Math.max(1, Math.floor(vp.width));
