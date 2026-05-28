@@ -1140,8 +1140,7 @@ async function deleteCachedPdf(id){
 
 let stageW=1, stageH=1;
 let imgRect = { iw:1, ih:1, sc:1, rot:0, cx:0.5, cy:0.5 };
-let mobileLayout = false;          // モバイル時：図面を左に寄せ吹き出しを右に並べる
-const MOBILE_IMG_FRAC = 0.56;      // 図面の占有率（左側）
+let mobileLayout = false;          // モバイル時：吹き出しを図面上部に横並び
 
 let BW = 172, BH = 60;
 let drag=null, pendingDrag=null;
@@ -1186,23 +1185,33 @@ function drawGrid(){
   imgRect={iw:stageW,ih:stageH,sc:1,rot:0,cx:stageW/2,cy:stageH/2};
 }
 
-// 図面を描画する領域の幅（モバイルは左寄せ）
-function imgRegionW(){ return mobileLayout ? Math.round(stageW*MOBILE_IMG_FRAC) : stageW; }
+// モバイル：吹き出しを図面上部に横並びするためのレイアウト計算
+function getMobLayout(){
+  const n=getPageRes().filter(r=>r.markerX!=null&&r.markerY!=null).length;
+  const gap=6, bh=40;
+  const cols=Math.max(2,Math.floor(stageW/118));            // 端末幅に応じた列数（約118px毎）
+  const bw=Math.floor((stageW-gap*(cols+1))/cols);
+  const rows=n>0?Math.ceil(n/cols):0;
+  const topH=n>0?(rows*(bh+gap)+gap):0;                       // 吹き出し領域の高さ
+  return {gap,bw,bh,cols,rows,topH,n};
+}
 
 function drawImageFit(img){
   const rot = isFs ? 0 : normalRot;
   const iw=img.width, ih=img.height;
-  const cw=imgRegionW(), ch=stageH;     // 描画領域（モバイルは左側のみ）
+  const lay = mobileLayout ? getMobLayout() : null;
+  const regY = lay?lay.topH:0;                 // 図面領域の上端（モバイルは吹き出しの下から）
+  const cw=stageW, ch=stageH-regY;             // 図面領域（モバイルは下側・全幅）
   const swapped = (rot===90||rot===270);
   const sc = Math.min(cw/(swapped?ih:iw), ch/(swapped?iw:ih));
-  const ccx=cw/2, ccy=ch/2;             // 描画領域の中心
+  const ccx=cw/2, ccy=regY+ch/2;               // 図面領域の中心
   imgRect = { iw, ih, sc, rot, cx:ccx, cy:ccy };
   ctx.clearRect(0,0,stageW,stageH);
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,stageW,stageH);
-  // モバイル：右側パネルの背景を薄く塗り分け
-  if(mobileLayout){
-    ctx.fillStyle="#f1f5f9"; ctx.fillRect(cw,0,stageW-cw,stageH);
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch);
+  // モバイル：上部の吹き出しパネル背景を薄く塗り分け
+  if(lay && lay.topH>0){
+    ctx.fillStyle="#eef2f7"; ctx.fillRect(0,0,stageW,lay.topH);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,regY,stageW,ch);
   }
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   if(rot===0){
@@ -1499,15 +1508,13 @@ function buildBubbleContent(res,idx,color,isSel,bw,bh,compact){
   frag.appendChild(mk("rect",{x:bw-badgeW-4,y:3,width:badgeW,height:13,rx:6,fill:ST_BG[st]||"#f1f5f9"}));
   const stb=mk("text",{x:bw-badgeW/2-4,y:12,"text-anchor":"middle","font-size":compact?"8":"9","font-weight":"700",fill:ST_COLOR[st]||"#64748b"});
   stb.textContent=st; frag.appendChild(stb);
-  const maxV=compact?10:14;
+  const maxV=compact?8:14;
   const vt=(res.vendorName||"").length>maxV?(res.vendorName||"").slice(0,maxV)+"…":(res.vendorName||"");
   if(compact){
-    const t1=mk("text",{x:11,y:18,"font-size":"10.5","font-weight":"800",fill:"#0f172a"});
-    t1.textContent=`${idx+1}. ${vt}`; frag.appendChild(t1);
-    const t2=mk("text",{x:11,y:30,"font-size":"9",fill:"#374151"});
-    t2.textContent=`${res.deliveryDate||"日付未設定"}${res.timeStart?" "+res.timeStart:""}`; frag.appendChild(t2);
-    const t3=mk("text",{x:11,y:41,"font-size":"9",fill:color});
-    t3.textContent="🚪"+((res.entrance||"未設定").slice(0,12)); frag.appendChild(t3);
+    const t1=mk("text",{x:9,y:16,"font-size":"10","font-weight":"800",fill:"#0f172a"});
+    t1.textContent=`${idx+1}.${vt}`; frag.appendChild(t1);
+    const t2=mk("text",{x:9,y:28,"font-size":"8.5",fill:color});
+    t2.textContent="🚪"+((res.entrance||"未設定").slice(0,9)); frag.appendChild(t2);
   } else {
     const t1=mk("text",{x:12,y:21,"font-size":"11","font-weight":"800",fill:"#0f172a"});
     t1.textContent=`${idx+1}. ${vt}`; frag.appendChild(t1);
@@ -1532,22 +1539,8 @@ function redrawOverlay(){
   const DEF_DY = -52 / (imgRect.ih * imgRect.sc);
   const rot=isFs?fsRot:0;
 
-  // ── モバイル：右パネルに吹き出しを縦に並べるための事前計算 ──
-  const withMarker=arr.filter(r=>r.markerX!=null&&r.markerY!=null);
-  let mob=null;
-  if(mobileLayout){
-    const panelX=imgRegionW()+4;
-    const mBW=Math.max(120,stageW-panelX-6);
-    const n=withMarker.length;
-    const pad=6;
-    let mBH=52;
-    if(n>0){
-      const avail=stageH-pad*2;
-      mBH=clamp(Math.floor(avail/n)-pad,40,52);
-    }
-    const step=mBH+pad;
-    mob={panelX,mBW,mBH,step,pad};
-  }
+  // ── モバイル：図面上部に吹き出しを横並びするための事前計算 ──
+  const mob = mobileLayout ? getMobLayout() : null;
   let mobIdx=0;
 
   arr.forEach((res,idx)=>{
@@ -1560,9 +1553,11 @@ function redrawOverlay(){
 
     let bx,by,bw,bh,compact;
     if(mob){
-      // 右パネルに縦積み
-      compact=true; bw=mob.mBW; bh=mob.mBH;
-      bx=mob.panelX; by=mob.pad+mobIdx*mob.step; mobIdx++;
+      // 上部パネルに横並び（行・列）
+      compact=true; bw=mob.bw; bh=mob.bh;
+      const col=mobIdx%mob.cols, row=Math.floor(mobIdx/mob.cols); mobIdx++;
+      bx=mob.gap+col*(mob.bw+mob.gap);
+      by=mob.gap+row*(mob.bh+mob.gap);
     } else {
       compact=false; bw=BW; bh=BH;
       const bdx = res.bubbleDx ?? DEF_DX;
@@ -1572,8 +1567,8 @@ function redrawOverlay(){
       by=clamp(_b.y, -BH*0.3, stageH-BH*0.7);
     }
     const bcx=bx+bw/2, bcy=by+bh/2;
-    // 引き出し線（モバイルは吹き出しの左端中央へ）
-    const lx2=mob?bx:bcx, ly2=mob?(by+bh/2):bcy;
+    // 引き出し線（モバイルは吹き出しの下端中央からマーカーへ）
+    const lx2=bcx, ly2=mob?(by+bh):bcy;
     const line=mk("line",{x1:ax,y1:ay,x2:lx2,y2:ly2,stroke:color,"stroke-width":1.6,"stroke-opacity":0.7,"stroke-dasharray":"4 2"});
     g.appendChild(line);
     const anc=mk("circle",{cx:ax,cy:ay,r:9,fill:color,stroke:isSel?"#0ea5e9":"white","stroke-width":isSel?3:2,cursor:"pointer"});
