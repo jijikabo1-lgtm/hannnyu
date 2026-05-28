@@ -515,6 +515,8 @@
     }
     @media(max-width:640px){.map-filterbar{padding:12px}.map-filter-hint{margin-left:0;width:100%;text-align:center}}
 
+    /* ── Stage shell (図面 + コントロール) ── */
+    .stage-shell{position:relative}
     /* ── Stage floating controls ── */
     .stage-ctrl{
       position:absolute;z-index:11;display:inline-flex;align-items:center;gap:2px;
@@ -551,9 +553,14 @@
     }
     .stage-ctrl > .fs-btn:hover{background:rgba(255,255,255,.14);transform:none}
     @media(max-width:640px){
-      .stage-ctrl{padding:3px;border-radius:9px}
-      .stage-ctrl > button,.stage-ctrl > .fs-btn{height:28px;min-width:28px;font-size:12.5px;padding:0 8px}
-      .stage-ctrl .page-lbl{height:28px;font-size:11px;min-width:60px;padding:0 6px}
+      /* モバイル：コントロールを図面の下に通常バーとして配置（図面に重ねない） */
+      .stage-shell{display:flex;flex-direction:column;gap:8px}
+      .stage-wrap{order:0;aspect-ratio:4/5}
+      .stage-ctrl{position:static;top:auto;left:auto;right:auto;padding:3px;border-radius:9px;justify-content:center;flex-wrap:wrap}
+      .stage-ctrl-tl{order:1}
+      .stage-ctrl-tr{order:2}
+      .stage-ctrl > button,.stage-ctrl > .fs-btn{height:30px;min-width:34px;font-size:13px;padding:0 10px}
+      .stage-ctrl .page-lbl{height:30px;font-size:11px;min-width:70px;padding:0 6px;flex:1}
     }
 
     /* ── Site selector ── */
@@ -694,16 +701,19 @@
       <div class="map-body-split">
         <!-- LEFT: floor plan -->
         <div class="map-stage-col">
-          <div class="stage-wrap" id="stageWrap">
-            <canvas id="bg"></canvas>
-            <svg id="overlay"></svg>
-            <!-- top-left: page nav -->
+          <div class="stage-shell">
+            <div class="stage-wrap" id="stageWrap">
+              <canvas id="bg"></canvas>
+              <svg id="overlay"></svg>
+              <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
+            </div>
+            <!-- page nav -->
             <div class="stage-ctrl stage-ctrl-tl">
               <button id="btnPrev" disabled title="前のページ">◀</button>
               <span class="page-lbl" id="pageInfo">PDF未選択</span>
               <button id="btnNext" disabled title="次のページ">▶</button>
             </div>
-            <!-- top-right: tools -->
+            <!-- tools -->
             <div class="stage-ctrl stage-ctrl-tr">
               <button id="btnRotL" title="左90°回転">↺</button>
               <button id="btnRotR" title="右90°回転">↻</button>
@@ -711,7 +721,6 @@
               <button id="btnSaveImg" title="図面と一覧を画像保存">画像保存</button>
               <button class="fs-btn" id="btnFs" title="全画面表示">⛶</button>
             </div>
-            <div class="stage-hint" id="stageHint">PDFをアップロードして図面上をクリックで予約追加</div>
           </div>
           <span id="mapCnt" style="display:none"></span>
           <div id="mapList" style="display:none"></div>
@@ -1130,7 +1139,9 @@ async function deleteCachedPdf(id){
 }
 
 let stageW=1, stageH=1;
-let imgRect = { iw:1, ih:1, sc:1, rot:0 };
+let imgRect = { iw:1, ih:1, sc:1, rot:0, cx:0.5, cy:0.5 };
+let mobileLayout = false;          // モバイル時：図面を左に寄せ吹き出しを右に並べる
+const MOBILE_IMG_FRAC = 0.56;      // 図面の占有率（左側）
 
 let BW = 172, BH = 60;
 let drag=null, pendingDrag=null;
@@ -1151,6 +1162,8 @@ function resizeStage(){
     cssW=Math.max(1,Math.round(r.width)); cssH=Math.max(1,Math.round(r.height));
   }
   stageW=cssW; stageH=cssH;
+  // モバイル判定（全画面時は通常表示）
+  mobileLayout = !isFs && window.matchMedia("(max-width:640px)").matches;
   const _bs=Math.min(1,Math.min(stageW,stageH)/480);
   BW=Math.max(110,Math.round(172*_bs)); BH=Math.max(60,Math.round(76*_bs));
   bgCanvas.width=Math.round(cssW*dpr); bgCanvas.height=Math.round(cssH*dpr);
@@ -1170,23 +1183,33 @@ function drawGrid(){
   for(let y=0;y<stageH;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(stageW,y);ctx.stroke(); }
   ctx.fillStyle="#94a3b8"; ctx.font="14px system-ui,sans-serif"; ctx.textAlign="center";
   ctx.fillText("PDFをアップロードしてください",stageW/2,stageH/2);
-  imgRect={iw:stageW,ih:stageH,sc:1,rot:0};
+  imgRect={iw:stageW,ih:stageH,sc:1,rot:0,cx:stageW/2,cy:stageH/2};
 }
+
+// 図面を描画する領域の幅（モバイルは左寄せ）
+function imgRegionW(){ return mobileLayout ? Math.round(stageW*MOBILE_IMG_FRAC) : stageW; }
 
 function drawImageFit(img){
   const rot = isFs ? 0 : normalRot;
-  const iw=img.width, ih=img.height, cw=stageW, ch=stageH;
+  const iw=img.width, ih=img.height;
+  const cw=imgRegionW(), ch=stageH;     // 描画領域（モバイルは左側のみ）
   const swapped = (rot===90||rot===270);
   const sc = Math.min(cw/(swapped?ih:iw), ch/(swapped?iw:ih));
-  imgRect = { iw, ih, sc, rot };
-  ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch);
+  const ccx=cw/2, ccy=ch/2;             // 描画領域の中心
+  imgRect = { iw, ih, sc, rot, cx:ccx, cy:ccy };
+  ctx.clearRect(0,0,stageW,stageH);
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,stageW,stageH);
+  // モバイル：右側パネルの背景を薄く塗り分け
+  if(mobileLayout){
+    ctx.fillStyle="#f1f5f9"; ctx.fillRect(cw,0,stageW-cw,stageH);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch);
+  }
   ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
   if(rot===0){
     const dw=iw*sc, dh=ih*sc;
-    ctx.drawImage(img,0,0,iw,ih,(cw-dw)/2,(ch-dh)/2,dw,dh);
+    ctx.drawImage(img,0,0,iw,ih,ccx-dw/2,ccy-dh/2,dw,dh);
   } else {
-    ctx.save(); ctx.translate(cw/2,ch/2); ctx.rotate(rot*Math.PI/180);
+    ctx.save(); ctx.translate(ccx,ccy); ctx.rotate(rot*Math.PI/180);
     ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality="high";
     ctx.drawImage(img,0,0,iw,ih,-iw*sc/2,-ih*sc/2,iw*sc,ih*sc);
     ctx.restore();
@@ -1194,18 +1217,18 @@ function drawImageFit(img){
 }
 
 function canvasPxToImgRatio(px,py){
-  const {iw,ih,sc,rot}=imgRect;
-  const cx=px-stageW/2, cy=py-stageH/2;
+  const {iw,ih,sc,rot,cx,cy}=imgRect;
+  const dx=px-cx, dy=py-cy;
   const rad=-rot*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
-  const lx=(cx*cos-cy*sin)/sc, ly=(cx*sin+cy*cos)/sc;
+  const lx=(dx*cos-dy*sin)/sc, ly=(dx*sin+dy*cos)/sc;
   return { x:lx/iw+0.5, y:ly/ih+0.5 };
 }
 function imgRatioToCanvasPx(rx,ry){
-  const {iw,ih,sc,rot}=imgRect;
+  const {iw,ih,sc,rot,cx,cy}=imgRect;
   const lx=(rx-0.5)*iw, ly=(ry-0.5)*ih;
   const rad=rot*Math.PI/180;
   const cos=Math.cos(rad), sin=Math.sin(rad);
-  return { x:(lx*cos-ly*sin)*sc+stageW/2, y:(lx*sin+ly*cos)*sc+stageH/2 };
+  return { x:(lx*cos-ly*sin)*sc+cx, y:(lx*sin+ly*cos)*sc+cy };
 }
 function svgPtFromEvent(e){
   const rot = isFs ? fsRot : 0;
@@ -1462,6 +1485,44 @@ function getPageRes(){
   });
 }
 
+const ST_COLOR={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
+const ST_BG={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
+
+// 吹き出しの中身を描画（bw/bh に合わせて自動調整、compact=モバイル簡易版）
+function buildBubbleContent(res,idx,color,isSel,bw,bh,compact){
+  const frag=document.createDocumentFragment();
+  frag.appendChild(mk("rect",{x:2,y:2,width:bw,height:bh,rx:10,fill:"rgba(0,0,0,0.07)"}));
+  frag.appendChild(mk("rect",{x:0,y:0,width:bw,height:bh,rx:10,fill:"white",stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
+  frag.appendChild(mk("rect",{x:0,y:0,width:5,height:bh,rx:3,fill:color}));
+  const st=res.status||"予約中";
+  const badgeW=compact?44:52;
+  frag.appendChild(mk("rect",{x:bw-badgeW-4,y:3,width:badgeW,height:13,rx:6,fill:ST_BG[st]||"#f1f5f9"}));
+  const stb=mk("text",{x:bw-badgeW/2-4,y:12,"text-anchor":"middle","font-size":compact?"8":"9","font-weight":"700",fill:ST_COLOR[st]||"#64748b"});
+  stb.textContent=st; frag.appendChild(stb);
+  const maxV=compact?10:14;
+  const vt=(res.vendorName||"").length>maxV?(res.vendorName||"").slice(0,maxV)+"…":(res.vendorName||"");
+  if(compact){
+    const t1=mk("text",{x:11,y:18,"font-size":"10.5","font-weight":"800",fill:"#0f172a"});
+    t1.textContent=`${idx+1}. ${vt}`; frag.appendChild(t1);
+    const t2=mk("text",{x:11,y:30,"font-size":"9",fill:"#374151"});
+    t2.textContent=`${res.deliveryDate||"日付未設定"}${res.timeStart?" "+res.timeStart:""}`; frag.appendChild(t2);
+    const t3=mk("text",{x:11,y:41,"font-size":"9",fill:color});
+    t3.textContent="🚪"+((res.entrance||"未設定").slice(0,12)); frag.appendChild(t3);
+  } else {
+    const t1=mk("text",{x:12,y:21,"font-size":"11","font-weight":"800",fill:"#0f172a"});
+    t1.textContent=`${idx+1}. ${vt}`; frag.appendChild(t1);
+    const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
+    t2.textContent=res.deliveryDate||"日付未設定"; frag.appendChild(t2);
+    const t3=mk("text",{x:12,y:43,"font-size":"10",fill:color});
+    t3.textContent="🚪 "+(res.entrance||"未設定"); frag.appendChild(t3);
+    const t4=mk("text",{x:12,y:54,"font-size":"10",fill:"#475569"});
+    t4.textContent="📍 "+((res.floor||"").slice(0,18)||"−"); frag.appendChild(t4);
+    const t5=mk("text",{x:12,y:65,"font-size":"10",fill:"#6b7280"});
+    t5.textContent="📦 "+((res.items||"").slice(0,18)||"−"); frag.appendChild(t5);
+  }
+  return frag;
+}
+
 function redrawOverlay(){
   while(overlay.firstChild) overlay.removeChild(overlay.firstChild);
   const hit=mk("rect",{x:0,y:0,width:stageW,height:stageH,fill:"transparent","pointer-events":"all"});
@@ -1469,6 +1530,26 @@ function redrawOverlay(){
   const arr=getPageRes();
   const DEF_DX = 24  / (imgRect.iw * imgRect.sc);
   const DEF_DY = -52 / (imgRect.ih * imgRect.sc);
+  const rot=isFs?fsRot:0;
+
+  // ── モバイル：右パネルに吹き出しを縦に並べるための事前計算 ──
+  const withMarker=arr.filter(r=>r.markerX!=null&&r.markerY!=null);
+  let mob=null;
+  if(mobileLayout){
+    const panelX=imgRegionW()+4;
+    const mBW=Math.max(120,stageW-panelX-6);
+    const n=withMarker.length;
+    const pad=6;
+    let mBH=52;
+    if(n>0){
+      const avail=stageH-pad*2;
+      mBH=clamp(Math.floor(avail/n)-pad,40,52);
+    }
+    const step=mBH+pad;
+    mob={panelX,mBW,mBH,step,pad};
+  }
+  let mobIdx=0;
+
   arr.forEach((res,idx)=>{
     if(res.markerX==null||res.markerY==null) return;
     const isSel=res.id===selId;
@@ -1476,43 +1557,34 @@ function redrawOverlay(){
     const g=mk("g",{"data-id":res.id});
     const a=imgRatioToCanvasPx(res.markerX, res.markerY);
     const ax=a.x, ay=a.y;
-    const bdx = res.bubbleDx ?? DEF_DX;
-    const bdy = res.bubbleDy ?? DEF_DY;
-    const _b = imgRatioToCanvasPx(res.markerX + bdx, res.markerY + bdy);
-    const bx=clamp(_b.x, -BW*0.3, stageW-BW*0.7);
-    const by=clamp(_b.y, -BH*0.3, stageH-BH*0.7);
-    const bcx=bx+BW/2, bcy=by+BH/2;
-    const rot=isFs?fsRot:0;
-    const line=mk("line",{x1:ax,y1:ay,x2:bcx,y2:bcy,stroke:color,"stroke-width":1.8,"stroke-opacity":0.75,"stroke-dasharray":"4 2"});
+
+    let bx,by,bw,bh,compact;
+    if(mob){
+      // 右パネルに縦積み
+      compact=true; bw=mob.mBW; bh=mob.mBH;
+      bx=mob.panelX; by=mob.pad+mobIdx*mob.step; mobIdx++;
+    } else {
+      compact=false; bw=BW; bh=BH;
+      const bdx = res.bubbleDx ?? DEF_DX;
+      const bdy = res.bubbleDy ?? DEF_DY;
+      const _b = imgRatioToCanvasPx(res.markerX + bdx, res.markerY + bdy);
+      bx=clamp(_b.x, -BW*0.3, stageW-BW*0.7);
+      by=clamp(_b.y, -BH*0.3, stageH-BH*0.7);
+    }
+    const bcx=bx+bw/2, bcy=by+bh/2;
+    // 引き出し線（モバイルは吹き出しの左端中央へ）
+    const lx2=mob?bx:bcx, ly2=mob?(by+bh/2):bcy;
+    const line=mk("line",{x1:ax,y1:ay,x2:lx2,y2:ly2,stroke:color,"stroke-width":1.6,"stroke-opacity":0.7,"stroke-dasharray":"4 2"});
     g.appendChild(line);
     const anc=mk("circle",{cx:ax,cy:ay,r:9,fill:color,stroke:isSel?"#0ea5e9":"white","stroke-width":isSel?3:2,cursor:"pointer"});
     anc.setAttribute("data-role","anchor"); g.appendChild(anc);
     const an=mk("text",{x:ax,y:ay+4.5,"text-anchor":"middle","font-size":"10","font-weight":"800",fill:"white","pointer-events":"none"});
     an.textContent=idx+1; g.appendChild(an);
-    const bcxRel=BW/2, bcyRel=BH/2;
-    const bubTr = rot===0 ? `translate(${bx},${by})` : `translate(${bx},${by}) rotate(${-rot},${bcxRel},${bcyRel})`;
+
+    const bubTr = (rot===0||mob) ? `translate(${bx},${by})` : `translate(${bx},${by}) rotate(${-rot},${bw/2},${bh/2})`;
     const bg2=mk("g",{transform:bubTr,cursor:"pointer"});
     bg2.setAttribute("data-role","bubble");
-    bg2.appendChild(mk("rect",{x:2,y:2,width:BW,height:BH,rx:11,fill:"rgba(0,0,0,0.07)"}));
-    bg2.appendChild(mk("rect",{x:0,y:0,width:BW,height:BH,rx:11,fill:"white",stroke:isSel?"#0ea5e9":color,"stroke-width":isSel?2.5:1.5}));
-    bg2.appendChild(mk("rect",{x:0,y:0,width:5,height:BH,rx:3,fill:color}));
-    const sc2={予約中:"#1d4ed8",完了:"#15803d",キャンセル:"#b91c1c"};
-    const sb2={予約中:"#dbeafe",完了:"#dcfce7",キャンセル:"#fee2e2"};
-    const st=res.status||"予約中";
-    bg2.appendChild(mk("rect",{x:BW-56,y:3,width:52,height:13,rx:6,fill:sb2[st]||"#f1f5f9"}));
-    const st2=mk("text",{x:BW-30,y:11,"text-anchor":"middle","font-size":"9","font-weight":"700",fill:sc2[st]||"#64748b"});
-    st2.textContent=st; bg2.appendChild(st2);
-    const t1=mk("text",{x:12,y:21,"font-size":"11","font-weight":"800",fill:"#0f172a"});
-    const vt=(res.vendorName||"").length>14?(res.vendorName||"").slice(0,14)+"…":(res.vendorName||"");
-    t1.textContent=`${idx+1}. ${vt}`; bg2.appendChild(t1);
-    const t2=mk("text",{x:12,y:32,"font-size":"10",fill:"#374151"});
-    t2.textContent=res.deliveryDate||"日付未設定"; bg2.appendChild(t2);
-    const t3=mk("text",{x:12,y:43,"font-size":"10",fill:color});
-    t3.textContent="🚪 "+(res.entrance||"未設定"); bg2.appendChild(t3);
-    const t4=mk("text",{x:12,y:54,"font-size":"10",fill:"#475569"});
-    t4.textContent="📍 "+((res.floor||"").slice(0,18)||"−"); bg2.appendChild(t4);
-    const t5=mk("text",{x:12,y:65,"font-size":"10",fill:"#6b7280"});
-    t5.textContent="📦 "+((res.items||"").slice(0,18)||"−"); bg2.appendChild(t5);
+    bg2.appendChild(buildBubbleContent(res,idx,color,isSel,bw,bh,compact));
     g.appendChild(bg2);
     overlay.appendChild(g);
   });
