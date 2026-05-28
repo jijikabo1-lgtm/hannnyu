@@ -2087,6 +2087,12 @@ $("calPrev").addEventListener("click",()=>{ calMonth--; if(calMonth<0){calMonth=
 $("calNext").addEventListener("click",()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
 $("calToday").addEventListener("click",()=>{ calYear=new Date().getFullYear(); calMonth=new Date().getMonth(); renderCalendar(); });
 
+// 図面タブの日付フィルターを当日にデフォルト設定
+(function setMapDateToday(){
+  const d=new Date();
+  const ymd=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  $("fltDateMap").value=ymd;
+})();
 ["fltVendorMap","fltDateMap","fltEntranceMap"].forEach(id=>$(id).addEventListener("change",()=>{ redrawOverlay(); updateMapList(); updateMapSideTable(); }));
 ["fltVendorList","fltStatus","fltFrom","fltTo","fltPage","fltSearch","fltEntranceList"].forEach(id=>{
   const el=$(id); if(!el) return;
