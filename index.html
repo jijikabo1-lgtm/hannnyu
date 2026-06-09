@@ -301,7 +301,9 @@
       overflow:hidden;aspect-ratio:16/9;box-shadow:var(--shadow-xs);
     }
     canvas#bg{position:absolute;top:0;left:0;display:block}
-    svg#overlay{position:absolute;top:0;left:0;touch-action:none}
+    /* 図面の何もないところは縦スワイプでページスクロール可、マーカー/吹き出しは touch-action:none で確実にドラッグ可能に */
+    svg#overlay{position:absolute;top:0;left:0;touch-action:pan-y}
+    svg#overlay [data-role]{touch-action:none}
     .fs-btn{
       position:absolute;top:12px;right:12px;z-index:10;
       background:rgba(11,18,32,.72);color:#fff;border:1px solid rgba(255,255,255,.12);
@@ -1740,7 +1742,6 @@ overlay.addEventListener("pointerdown",e=>{
           }
         },LONG_PRESS_MS)
       };
-      toast("長押しで予約追加（指を離さず待機）", 1500);
     } else {
       // マウス：従来どおり即時オープン
       openNewForm(p.x,p.y);
