@@ -894,8 +894,8 @@
       </div>
       <div class="field" style="margin-top:14px">
         <label>フロア一覧（1行に1階、上から順に記入）</label>
-        <textarea id="siteFloors" rows="8" placeholder="例：&#10;屋上&#10;15F&#10;14F&#10;13F&#10;..." style="resize:vertical;min-height:140px"></textarea>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">予約フォームのフロア欄や階数別タブで使用されます。</div>
+        <textarea id="siteFloors" rows="8" placeholder="空欄の場合は既定（屋上〜15F〜B2）を使用&#10;例：&#10;屋上&#10;15F&#10;14F&#10;..." style="resize:vertical;min-height:140px"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">空欄の場合は既定（屋上・15F〜1F・B1・B2）が自動適用されます。現場に合わせて自由に変更可能です。</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1861,11 +1861,18 @@ function updateDatalists(){
   $("contactOpts").innerHTML=contacts.map(v=>`<option value="${esc(v)}">`).join("");
   $("entranceOpts").innerHTML=entrances.map(v=>`<option value="${esc(v)}">`).join("");
 }
-// 現場の floors 設定（+ 既存予約から検出）でフロア選択肢を更新
-function updateFloorSelect(selected){
+// 既定のフロア一覧（屋上 → 15F → … → 1F → B1 → B2）
+const DEFAULT_FLOORS = ["屋上","15F","14F","13F","12F","11F","10F","9F","8F","7F","6F","5F","4F","3F","2F","1F","B1","B2"];
+function effectiveFloors(){
   const site=sites.find(s=>s.id===currentSiteId);
-  const floors=(site && Array.isArray(site.floors)) ? site.floors.slice() : [];
-  reservations.forEach(r=>{ if(r.floor && !floors.includes(r.floor)) floors.push(r.floor); });
+  const arr = (site && Array.isArray(site.floors) && site.floors.length>0) ? site.floors.slice() : DEFAULT_FLOORS.slice();
+  // 既存予約からも吸い上げ（一覧にない値の救済）
+  reservations.forEach(r=>{ if(r.floor && !arr.includes(r.floor)) arr.push(r.floor); });
+  return arr;
+}
+// 現場の floors 設定（無ければ既定一覧）でフロア選択肢を更新
+function updateFloorSelect(selected){
+  const floors=effectiveFloors();
   if(selected && !floors.includes(selected)) floors.unshift(selected);
   const sel=$("fFloor"); if(!sel) return;
   sel.innerHTML='<option value="">-- 選択 --</option>'+floors.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join("");
@@ -2160,13 +2167,7 @@ document.querySelectorAll(".tab-btn").forEach(btn=>{
 // ── 階数別ビュー ──
 let floorSelected=null;       // 選択中のフロア名
 let floorAllDates=false;      // 全期間表示モード
-function getFloorList(){
-  const site=sites.find(s=>s.id===currentSiteId);
-  const floors=(site && Array.isArray(site.floors)) ? site.floors.slice() : [];
-  // 既存予約からも吸い上げ（未登録フロアの救済）
-  reservations.forEach(r=>{ if(r.floor && !floors.includes(r.floor)) floors.push(r.floor); });
-  return floors;
-}
+function getFloorList(){ return effectiveFloors(); }
 function floorResForDate(floor){
   const date=$("floorDate")?.value || "";
   return reservations.filter(r=>{
