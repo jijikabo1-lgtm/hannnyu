@@ -423,6 +423,47 @@
     .cal-more{font-size:10px;color:var(--muted);text-align:center;font-weight:600}
     @media(max-width:640px){.cal-cell{min-height:64px;padding:4px}.cal-event{font-size:9px;padding:1px 3px}.cal-head{padding:4px 2px;font-size:10px}}
 
+    /* ── Floor cross-section view ── */
+    .floor-section-wrap{display:flex;gap:18px;align-items:stretch}
+    .floor-section{flex:0 0 42%;min-width:280px;max-width:520px;background:linear-gradient(180deg,#fafbfd,#fff);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--shadow-xs);max-height:74vh;overflow-y:auto}
+    .floor-detail{flex:1;min-width:0;background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--shadow-xs);max-height:74vh;overflow-y:auto}
+    .floor-detail-hdr{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:12px}
+    .floor-row{
+      display:flex;align-items:center;gap:10px;
+      padding:12px 14px;border:1px solid var(--border);border-bottom:none;
+      background:#fff;cursor:pointer;transition:all var(--t-fast);
+      font-weight:600;font-size:14px;position:relative;
+    }
+    .floor-row:first-child{border-radius:10px 10px 0 0}
+    .floor-row:last-child{border-radius:0 0 10px 10px;border-bottom:1px solid var(--border)}
+    .floor-row:only-child{border-radius:10px}
+    .floor-row::after{
+      content:"";position:absolute;left:14px;right:14px;bottom:-1px;
+      border-bottom:1px dashed #cbd5e1;pointer-events:none;
+    }
+    .floor-row:last-child::after{display:none}
+    .floor-row:hover{background:#f8fafc;border-color:#a5b4fc;z-index:1}
+    .floor-row.active{background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-color:#6366f1;color:#3730a3;z-index:2}
+    .floor-row .floor-name{flex:1;min-width:0}
+    .floor-row .floor-cnt{
+      display:inline-flex;align-items:center;justify-content:center;
+      min-width:28px;height:24px;padding:0 8px;border-radius:12px;
+      font-size:12px;font-weight:700;background:#e2e8f0;color:#475569;
+    }
+    .floor-row.has-res .floor-cnt{background:#4f46e5;color:#fff}
+    .floor-row.active .floor-cnt{background:#3730a3;color:#fff}
+    .floor-detail-item{
+      padding:12px;border:1px solid var(--border);border-radius:10px;
+      margin-bottom:10px;background:#fff;cursor:pointer;transition:all var(--t-fast);
+    }
+    .floor-detail-item:hover{border-color:#a5b4fc;box-shadow:0 4px 12px rgba(79,70,229,.08)}
+    .floor-detail-empty{padding:30px 16px;text-align:center;color:var(--muted);font-size:13px}
+    @media(max-width:768px){
+      .floor-section-wrap{flex-direction:column}
+      .floor-section{flex:none;max-width:none;max-height:50vh}
+      .floor-detail{flex:none;max-height:none}
+    }
+
     /* ── Config warning ── */
     .cfg-warn{
       background:linear-gradient(180deg,#fffbeb,#fef3c7);
@@ -668,7 +709,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-tab="map">📐 図面・予約</button>
   <button class="tab-btn" data-tab="list">📋 予約一覧</button>
-  <button class="tab-btn" data-tab="cal">📅 カレンダー</button>
+  <button class="tab-btn" data-tab="floor">🏢 階数別</button>
 </div>
 
 <!-- ════ MAIN ════ -->
@@ -800,26 +841,36 @@
   </div>
 
   <!-- ── CALENDAR TAB ── -->
-  <div class="tab-pane" id="tab-cal">
+  <div class="tab-pane" id="tab-floor">
     <div class="card">
       <div class="card-hdr">
-        <button class="btn" id="calPrev">◀ 前月</button>
-        <h2 id="calTitle" style="min-width:140px;text-align:center">-</h2>
-        <button class="btn" id="calNext">翌月 ▶</button>
-        <button class="btn" id="calToday" style="margin-left:auto">今月へ</button>
+        <h2>🏢 階数別予約</h2>
+        <div style="display:flex;gap:10px;align-items:center;margin-left:auto;flex-wrap:wrap">
+          <label style="font-size:12px;color:var(--muted)">日付</label>
+          <input type="date" id="floorDate" style="border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px" />
+          <button class="btn" id="floorToday">今日</button>
+          <button class="btn" id="floorAllDates" title="全期間表示">📅 全期間</button>
+        </div>
       </div>
       <div class="card-body">
-        <div class="cal-grid cal-head-row">
-          <div class="cal-head" style="color:#dc2626">日</div>
-          <div class="cal-head">月</div>
-          <div class="cal-head">火</div>
-          <div class="cal-head">水</div>
-          <div class="cal-head">木</div>
-          <div class="cal-head">金</div>
-          <div class="cal-head" style="color:#2563eb">土</div>
+        <div class="floor-section-wrap">
+          <!-- 左：断面図 -->
+          <div class="floor-section">
+            <div id="floorStack"></div>
+            <div id="floorEmpty" style="display:none;text-align:center;padding:40px 16px;color:var(--muted);font-size:13px;line-height:1.7">
+              この現場にはまだフロアが登録されていません。<br>
+              ヘッダーの「切替」→ 編集（✏）から<br>フロア一覧を登録してください。
+            </div>
+          </div>
+          <!-- 右：選択フロアの予約一覧 -->
+          <div class="floor-detail">
+            <div class="floor-detail-hdr">
+              <strong id="floorDetailTitle">フロアを選択してください</strong>
+              <span id="floorDetailCnt" style="font-size:12px;color:var(--muted)"></span>
+            </div>
+            <div id="floorDetailList"></div>
+          </div>
         </div>
-        <div class="cal-grid" id="calBody"></div>
-        <div style="font-size:12px;color:var(--muted);margin-top:12px;text-align:center">📌 日付をクリック → その日の予約一覧へ移動</div>
       </div>
     </div>
   </div>
@@ -840,6 +891,11 @@
       <div class="field">
         <label>現場名 <span class="req">*</span></label>
         <input type="text" id="siteName" placeholder="例：〇〇ビル新築工事" />
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label>フロア一覧（1行に1階、上から順に記入）</label>
+        <textarea id="siteFloors" rows="8" placeholder="例：&#10;屋上&#10;15F&#10;14F&#10;13F&#10;..." style="resize:vertical;min-height:140px"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">予約フォームのフロア欄や階数別タブで使用されます。</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -881,7 +937,7 @@
             <select id="fTeM" style="flex:1"><option value="">分</option><option value="00">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select>
           </div>
         </div>
-        <div class="field"><label>フロア / 搬入場所</label><input type="text" id="fFloor" list="floorOpts" placeholder="例：1F 玄関ホール" /><datalist id="floorOpts"></datalist></div>
+        <div class="field"><label>フロア / 搬入場所</label><select id="fFloor"><option value="">-- 選択 --</option></select></div>
         <div class="field"><label>🚪 搬入口 <span class="req">*</span></label><input type="text" id="fEntrance" list="entranceOpts" placeholder="例：北側搬入口、南口、A搬入口…" /><datalist id="entranceOpts"></datalist></div>
         <div class="field"><label>車両種別</label>
           <select id="fVehicle"><option value="">選択なし</option><option>軽トラック</option><option>1トン車</option><option>2トン車</option><option>2トンユニック車</option><option>4トン車</option><option>4トンユニック車</option><option>10トン車</option><option>10トンユニック車</option><option>ダンプ</option><option>クレーン車</option><option>フォークリフト</option><option>セミトレーラー</option><option>軽自動車</option><option>その他</option></select>
@@ -1800,12 +1856,20 @@ function updatePageFilter(){
 function updateDatalists(){
   const vendors=[...new Set(reservations.map(r=>r.vendorName).filter(Boolean))].sort();
   const contacts=[...new Set(reservations.map(r=>r.contactPerson).filter(Boolean))].sort();
-  const floors=[...new Set(reservations.map(r=>r.floor).filter(Boolean))].sort();
   const entrances=[...new Set(reservations.map(r=>r.entrance).filter(Boolean))].sort();
   $("vendorOpts").innerHTML=vendors.map(v=>`<option value="${esc(v)}">`).join("");
   $("contactOpts").innerHTML=contacts.map(v=>`<option value="${esc(v)}">`).join("");
-  $("floorOpts").innerHTML=floors.map(v=>`<option value="${esc(v)}">`).join("");
   $("entranceOpts").innerHTML=entrances.map(v=>`<option value="${esc(v)}">`).join("");
+}
+// 現場の floors 設定（+ 既存予約から検出）でフロア選択肢を更新
+function updateFloorSelect(selected){
+  const site=sites.find(s=>s.id===currentSiteId);
+  const floors=(site && Array.isArray(site.floors)) ? site.floors.slice() : [];
+  reservations.forEach(r=>{ if(r.floor && !floors.includes(r.floor)) floors.push(r.floor); });
+  if(selected && !floors.includes(selected)) floors.unshift(selected);
+  const sel=$("fFloor"); if(!sel) return;
+  sel.innerHTML='<option value="">-- 選択 --</option>'+floors.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join("");
+  sel.value=selected||"";
 }
 function updateMapSideTable(){
   const tbody=$("mapSideTbody"), cnt=$("mapSideCnt");
@@ -1849,7 +1913,7 @@ function updateMapSideTable(){
 function onDataUpdate(){
   redrawOverlay(); updateMapList(); updateMapSideTable(); renderTable(); updateStats(); updateVendorSelects(); updatePageFilter(); updateDatalists();
   // カレンダータブが表示中なら再描画
-  if(document.getElementById("tab-cal")?.classList.contains("active")) renderCalendar();
+  if(document.getElementById("tab-floor")?.classList.contains("active")) renderFloorSection();
 }
 
 async function loadReservations(){
@@ -1894,6 +1958,7 @@ function openNewForm(canX,canY){
   editingId=null; pendingMx=canX; pendingMy=canY;
   $("formTitle").textContent="📦 搬入予約を追加";
   clearForm(); $("fDate").value=new Date().toISOString().slice(0,10);
+  updateFloorSelect();
   $("fPage").value=curPage; $("statusField").style.display="none";
   $("formModal").classList.add("open");
 }
@@ -1923,7 +1988,7 @@ function openEditForm(id){
   $("fId").value=id; $("fVendor").value=r.vendorName||""; $("fContact").value=r.contactPerson||"";
   $("fPhone").value=r.phone||""; $("fDate").value=r.deliveryDate||"";
   setTimeVal("fTsH","fTsM",r.timeStart||""); setTimeVal("fTeH","fTeM",r.timeEnd||"");
-  $("fFloor").value=r.floor||""; $("fEntrance").value=r.entrance||""; $("fVehicle").value=r.vehicleType||"";
+  updateFloorSelect(r.floor||""); $("fEntrance").value=r.entrance||""; $("fVehicle").value=r.vehicleType||"";
   $("fItems").value=r.items||""; $("fNotes").value=r.notes||"";
   $("fStatus").value=r.status||"予約中"; $("statusField").style.display="block";
   $("formModal").classList.add("open");
@@ -2088,84 +2153,113 @@ document.querySelectorAll(".tab-btn").forEach(btn=>{
     btn.classList.add("active");
     $("tab-"+btn.dataset.tab).classList.add("active");
     if(btn.dataset.tab==="list") renderTable();
-    if(btn.dataset.tab==="cal") renderCalendar();
+    if(btn.dataset.tab==="floor") renderFloorSection();
   });
 });
 
-// ── カレンダー機能 ──
-let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
-function renderCalendar(){
-  const body=$("calBody"); if(!body) return;
-  $("calTitle").textContent=`${calYear}年${calMonth+1}月`;
-  const first=new Date(calYear,calMonth,1);
-  const last=new Date(calYear,calMonth+1,0);
-  const startDay=first.getDay();
-  const totalDays=last.getDate();
-  const today=new Date().toISOString().slice(0,10);
-  body.innerHTML="";
-  // 前月分の空セル
-  for(let i=0;i<startDay;i++){
-    const prevDate=new Date(calYear,calMonth,-startDay+i+1);
-    body.appendChild(makeCalCell(prevDate,true));
-  }
-  // 当月
-  for(let d=1;d<=totalDays;d++){
-    const date=new Date(calYear,calMonth,d);
-    body.appendChild(makeCalCell(date,false));
-  }
-  // 末尾埋め
-  const filled=startDay+totalDays;
-  const rest=(7-filled%7)%7;
-  for(let i=1;i<=rest;i++){
-    const nextDate=new Date(calYear,calMonth+1,i);
-    body.appendChild(makeCalCell(nextDate,true));
-  }
+// ── 階数別ビュー ──
+let floorSelected=null;       // 選択中のフロア名
+let floorAllDates=false;      // 全期間表示モード
+function getFloorList(){
+  const site=sites.find(s=>s.id===currentSiteId);
+  const floors=(site && Array.isArray(site.floors)) ? site.floors.slice() : [];
+  // 既存予約からも吸い上げ（未登録フロアの救済）
+  reservations.forEach(r=>{ if(r.floor && !floors.includes(r.floor)) floors.push(r.floor); });
+  return floors;
 }
-function makeCalCell(date,isOther){
-  const cell=document.createElement("div");
-  cell.className="cal-cell"+(isOther?" other-month":"");
-  const dow=date.getDay();
-  if(dow===0) cell.classList.add("weekend-sun");
-  if(dow===6) cell.classList.add("weekend-sat");
-  const dateStr=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
-  const todayStr=new Date().toISOString().slice(0,10);
-  if(dateStr===todayStr) cell.classList.add("today");
-  const num=document.createElement("div");
-  num.className="cal-date"; num.textContent=date.getDate();
-  cell.appendChild(num);
-  // この日の予約
-  const dayRes=reservations.filter(r=>r.deliveryDate===dateStr && (r.status||"予約中")!=="キャンセル");
-  const MAX_SHOW=3;
-  dayRes.slice(0,MAX_SHOW).forEach(r=>{
-    const ev=document.createElement("div");
-    ev.className="cal-event";
-    ev.style.background=vColor(r.vendorName||"");
-    ev.textContent=`${r.timeStart||""} ${r.vendorName||""}`.trim();
-    ev.title=`${r.vendorName} / ${r.items||""}`;
-    cell.appendChild(ev);
+function floorResForDate(floor){
+  const date=$("floorDate")?.value || "";
+  return reservations.filter(r=>{
+    if((r.status||"予約中")==="キャンセル") return false;
+    if(r.floor!==floor) return false;
+    if(!floorAllDates && date && r.deliveryDate!==date) return false;
+    return true;
+  }).sort((a,b)=>{
+    const d=(a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+    if(d) return d;
+    return (a.timeStart||"").localeCompare(b.timeStart||"");
   });
-  if(dayRes.length>MAX_SHOW){
-    const more=document.createElement("div");
-    more.className="cal-more";
-    more.textContent=`他 +${dayRes.length-MAX_SHOW}件`;
-    cell.appendChild(more);
-  }
-  cell.addEventListener("click",()=>{
-    // この日付で一覧フィルタ
-    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-    document.querySelectorAll(".tab-pane").forEach(p=>p.classList.remove("active"));
-    document.querySelector('.tab-btn[data-tab="list"]').classList.add("active");
-    $("tab-list").classList.add("active");
-    ["fltVendorList","fltStatus","fltPage","fltSearch","fltEntranceList"].forEach(id=>{ const e=$(id); if(e) e.value=""; });
-    $("fltFrom").value=dateStr; $("fltTo").value=dateStr;
-    document.querySelectorAll("[data-quick]").forEach(c=>c.classList.remove("active"));
-    renderTable();
-  });
-  return cell;
 }
-$("calPrev").addEventListener("click",()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); });
-$("calNext").addEventListener("click",()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
-$("calToday").addEventListener("click",()=>{ calYear=new Date().getFullYear(); calMonth=new Date().getMonth(); renderCalendar(); });
+function renderFloorSection(){
+  const floors=getFloorList();
+  const stack=$("floorStack"), empty=$("floorEmpty");
+  if(!stack) return;
+  if(floors.length===0){
+    stack.innerHTML=""; empty.style.display="block";
+    $("floorDetailTitle").textContent="フロアが未登録です";
+    $("floorDetailCnt").textContent="";
+    $("floorDetailList").innerHTML='<div class="floor-detail-empty">ヘッダー「切替」→ 編集 から、現場ごとのフロア一覧を登録してください。</div>';
+    return;
+  }
+  empty.style.display="none";
+  stack.innerHTML=floors.map(f=>{
+    const cnt=floorResForDate(f).length;
+    const isAct = f===floorSelected;
+    return `<div class="floor-row ${cnt>0?"has-res":""} ${isAct?"active":""}" data-floor="${esc(f)}">
+      <span class="floor-name">${esc(f)}</span>
+      <span class="floor-cnt">${cnt}</span>
+    </div>`;
+  }).join("");
+  stack.querySelectorAll(".floor-row").forEach(el=>{
+    el.addEventListener("click",()=>{
+      floorSelected=el.getAttribute("data-floor");
+      renderFloorSection();
+    });
+  });
+  renderFloorDetail();
+}
+function renderFloorDetail(){
+  const wrap=$("floorDetailList");
+  if(!floorSelected){
+    $("floorDetailTitle").textContent="フロアを選択してください";
+    $("floorDetailCnt").textContent="";
+    wrap.innerHTML='<div class="floor-detail-empty">左の断面図からフロアをクリックすると、その日の予約一覧が表示されます。</div>';
+    return;
+  }
+  const list=floorResForDate(floorSelected);
+  $("floorDetailTitle").textContent=`${floorSelected} の予約`;
+  const dateLbl = floorAllDates ? "全期間" : ($("floorDate").value||"");
+  $("floorDetailCnt").textContent=`${list.length}件 / ${dateLbl}`;
+  if(list.length===0){
+    wrap.innerHTML='<div class="floor-detail-empty">この条件の予約はありません。</div>';
+    return;
+  }
+  wrap.innerHTML=list.map(r=>{
+    const col=vColor(r.vendorName||"");
+    const ec=resColor(r);
+    return `<div class="floor-detail-item" onclick="openEditForm('${r.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+        <strong style="display:inline-flex;align-items:center;gap:6px;font-size:14px">
+          <span style="width:9px;height:9px;border-radius:50%;background:${col}"></span>${esc(r.vendorName||"-")}
+        </strong>
+        <span class="badge badge-${esc(r.status||"予約中")}">${esc(r.status||"予約中")}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7">
+        📅 ${esc(r.deliveryDate||"-")} ${esc(r.timeStart||"")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}<br>
+        <span style="color:${ec};font-weight:700">🚪 ${esc(r.entrance||"-")}</span><br>
+        📦 ${esc(r.items||"-")}
+      </div>
+    </div>`;
+  }).join("");
+}
+// 日付初期化
+(function initFloorDate(){
+  const d=new Date();
+  const ymd=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  $("floorDate").value=ymd;
+})();
+$("floorDate").addEventListener("change",()=>{ floorAllDates=false; $("floorAllDates").classList.remove("active"); renderFloorSection(); });
+$("floorToday").addEventListener("click",()=>{
+  const d=new Date();
+  $("floorDate").value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  floorAllDates=false; $("floorAllDates").classList.remove("active");
+  renderFloorSection();
+});
+$("floorAllDates").addEventListener("click",()=>{
+  floorAllDates=!floorAllDates;
+  $("floorAllDates").classList.toggle("active",floorAllDates);
+  renderFloorSection();
+});
 
 // 図面タブの日付フィルターを当日にデフォルト設定
 (function setMapDateToday(){
@@ -2474,10 +2568,15 @@ let siteModalReturnTo=null;
 function showSiteModal(isEdit=false){
   siteEditId=isEdit?currentSiteId:null;
   $("siteModalTitle").textContent=isEdit?"✏️ 現場を編集":"🏗 現場を追加";
-  $("siteName").value=isEdit?(sites.find(s=>s.id===currentSiteId)?.name||""):"";
+  const cur = isEdit?sites.find(s=>s.id===currentSiteId):null;
+  $("siteName").value=cur?.name||"";
+  $("siteFloors").value=(cur?.floors||[]).join("\n");
   $("btnSiteDel").style.display=isEdit&&sites.length>1?"inline-flex":"none";
   $("siteModal").classList.add("open");
   setTimeout(()=>$("siteName").focus(),100);
+}
+function parseFloorsText(txt){
+  return (txt||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
 }
 function closeSiteModal(){
   $("siteModal").classList.remove("open");
@@ -2518,13 +2617,14 @@ $("btnSiteSwitch").addEventListener("click", showSitePicker);
 $("siteModalSave").addEventListener("click",async()=>{
   const name=$("siteName").value.trim();
   if(!name){ toast("現場名を入力してください"); $("siteName").focus(); return; }
+  const floors=parseFloorsText($("siteFloors").value);
   const btn=$("siteModalSave"); btn.disabled=true; btn.innerHTML=`<span class="spin"></span>`;
   try{
     if(siteEditId){
-      await db.collection("sites").doc(siteEditId).update({name});
-      toast("現場名を変更しました ✅");
+      await db.collection("sites").doc(siteEditId).update({name,floors});
+      toast("現場を更新しました ✅");
     } else {
-      const ref=await db.collection("sites").add({name,pdfId:null,fileName:null,rotation:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      const ref=await db.collection("sites").add({name,floors,pdfId:null,fileName:null,rotation:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
       currentSiteId=null; // selectSite内の重複チェックを回避
       await selectSite(ref.id);
       toast(`「${name}」を追加しました ✅`);
