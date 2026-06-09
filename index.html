@@ -1681,10 +1681,24 @@ function updateFsInfo(){
 
 // タッチ/ペン端末では長押しでのみ新規予約を開く（スワイプ・タップでは反応しない）
 let pendingNewForm=null;
-const LONG_PRESS_MS=500;
+const LONG_PRESS_MS=600;
+const NEW_FORM_MOVE_THR=4;
 function cancelPendingNewForm(){
   if(pendingNewForm){ clearTimeout(pendingNewForm.timer); pendingNewForm=null; }
 }
+// タッチイベントを直接監視（pointermove が取りこぼされる端末対策）
+overlay.addEventListener("touchmove",e=>{
+  if(!pendingNewForm || !e.touches.length) return;
+  const t=e.touches[0];
+  const r=overlay.getBoundingClientRect();
+  const x=(t.clientX-r.left)*(stageW/Math.max(1,r.width));
+  const y=(t.clientY-r.top)*(stageH/Math.max(1,r.height));
+  if(Math.hypot(x-pendingNewForm.startX,y-pendingNewForm.startY)>=NEW_FORM_MOVE_THR){
+    cancelPendingNewForm();
+  }
+},{passive:true});
+overlay.addEventListener("touchend",()=>{ cancelPendingNewForm(); },{passive:true});
+overlay.addEventListener("touchcancel",()=>{ cancelPendingNewForm(); },{passive:true});
 
 overlay.addEventListener("pointerdown",e=>{
   if(e.button===2) return;
@@ -1739,7 +1753,7 @@ overlay.addEventListener("pointermove",e=>{
   // 長押し待機中：少しでも動いたら新規予約をキャンセル（スワイプ扱い）
   if(pendingNewForm){
     const p=svgPtFromEvent(e);
-    if(Math.hypot(p.x-pendingNewForm.startX,p.y-pendingNewForm.startY)>=DRAG_THR){
+    if(Math.hypot(p.x-pendingNewForm.startX,p.y-pendingNewForm.startY)>=NEW_FORM_MOVE_THR){
       cancelPendingNewForm();
     }
   }
