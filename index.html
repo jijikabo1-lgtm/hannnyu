@@ -2203,7 +2203,9 @@ function renderFloorSection(){
   }).join("");
   stack.querySelectorAll(".floor-row").forEach(el=>{
     el.addEventListener("click",()=>{
-      floorSelected=el.getAttribute("data-floor");
+      const f=el.getAttribute("data-floor");
+      // 既に選択中のフロアを再クリック → 解除して全件表示
+      floorSelected = (floorSelected===f) ? null : f;
       renderFloorSection();
     });
   });
@@ -2211,16 +2213,29 @@ function renderFloorSection(){
 }
 function renderFloorDetail(){
   const wrap=$("floorDetailList");
-  if(!floorSelected){
-    $("floorDetailTitle").textContent="フロアを選択してください";
-    $("floorDetailCnt").textContent="";
-    wrap.innerHTML='<div class="floor-detail-empty">左の断面図からフロアをクリックすると、その日の予約一覧が表示されます。</div>';
-    return;
-  }
-  const list=floorResForDate(floorSelected);
-  $("floorDetailTitle").textContent=`${floorSelected} の予約`;
   const dateLbl = floorAllDates ? "全期間" : ($("floorDate").value||"");
-  $("floorDetailCnt").textContent=`${list.length}件 / ${dateLbl}`;
+  let list;
+  if(!floorSelected){
+    // フロア未選択：全フロアの予定を表示（日付フィルタは適用）
+    const date=$("floorDate")?.value||"";
+    list=reservations.filter(r=>{
+      if((r.status||"予約中")==="キャンセル") return false;
+      if(!floorAllDates && date && r.deliveryDate!==date) return false;
+      return true;
+    }).sort((a,b)=>{
+      const d=(a.deliveryDate||"").localeCompare(b.deliveryDate||"");
+      if(d) return d;
+      const t=(a.timeStart||"").localeCompare(b.timeStart||"");
+      if(t) return t;
+      return (a.floor||"").localeCompare(b.floor||"");
+    });
+    $("floorDetailTitle").textContent="すべての予約（フロア未選択）";
+    $("floorDetailCnt").textContent=`${list.length}件 / ${dateLbl}`;
+  } else {
+    list=floorResForDate(floorSelected);
+    $("floorDetailTitle").textContent=`${floorSelected} の予約`;
+    $("floorDetailCnt").textContent=`${list.length}件 / ${dateLbl}`;
+  }
   if(list.length===0){
     wrap.innerHTML='<div class="floor-detail-empty">この条件の予約はありません。</div>';
     return;
@@ -2237,7 +2252,7 @@ function renderFloorDetail(){
       </div>
       <div style="font-size:12px;color:var(--muted);line-height:1.7">
         📅 ${esc(r.deliveryDate||"-")} ${esc(r.timeStart||"")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}<br>
-        <span style="color:${ec};font-weight:700">🚪 ${esc(r.entrance||"-")}</span><br>
+        🏢 <strong style="color:#334155">${esc(r.floor||"-")}</strong> ／ <span style="color:${ec};font-weight:700">🚪 ${esc(r.entrance||"-")}</span><br>
         📦 ${esc(r.items||"-")}
       </div>
     </div>`;
