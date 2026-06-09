@@ -1679,6 +1679,13 @@ function updateFsInfo(){
   $("fsPageInfo").textContent=pdfDoc?`${curPage}/${pageCount}`:"-";
 }
 
+// タッチ/ペン端末では長押しでのみ新規予約を開く（スワイプ・タップでは反応しない）
+let pendingNewForm=null;
+const LONG_PRESS_MS=500;
+function cancelPendingNewForm(){
+  if(pendingNewForm){ clearTimeout(pendingNewForm.timer); pendingNewForm=null; }
+}
+
 overlay.addEventListener("pointerdown",e=>{
   if(e.button===2) return;
   const groupEl=e.target.closest("g[data-id]");
@@ -1707,12 +1714,35 @@ overlay.addEventListener("pointerdown",e=>{
     e.preventDefault();
   } else {
     const p=svgPtFromEvent(e);
-    openNewForm(p.x,p.y);
-    e.preventDefault();
+    if(e.pointerType==="touch"||e.pointerType==="pen"){
+      // タッチ：長押しで予約追加（スワイプやタップでは反応させない）
+      cancelPendingNewForm();
+      pendingNewForm={
+        x:p.x, y:p.y, startX:p.x, startY:p.y,
+        timer:setTimeout(()=>{
+          if(pendingNewForm){
+            const pf=pendingNewForm; pendingNewForm=null;
+            openNewForm(pf.x,pf.y);
+          }
+        },LONG_PRESS_MS)
+      };
+      toast("長押しで予約追加（指を離さず待機）", 1500);
+    } else {
+      // マウス：従来どおり即時オープン
+      openNewForm(p.x,p.y);
+      e.preventDefault();
+    }
   }
 });
 
 overlay.addEventListener("pointermove",e=>{
+  // 長押し待機中：少しでも動いたら新規予約をキャンセル（スワイプ扱い）
+  if(pendingNewForm){
+    const p=svgPtFromEvent(e);
+    if(Math.hypot(p.x-pendingNewForm.startX,p.y-pendingNewForm.startY)>=DRAG_THR){
+      cancelPendingNewForm();
+    }
+  }
   if(pendingDrag&&!drag){
     const p=svgPtFromEvent(e);
     if(Math.hypot(p.x-pendingDrag.startX,p.y-pendingDrag.startY)>=DRAG_THR){ drag=pendingDrag; pendingDrag=null; }
@@ -1738,6 +1768,8 @@ overlay.addEventListener("pointermove",e=>{
 });
 
 overlay.addEventListener("pointerup",async e=>{
+  // 長押し待機中に指を離した（短いタップ）→ 予約追加は発火させない
+  cancelPendingNewForm();
   if(pendingDrag){
     try{ overlay.releasePointerCapture(pendingDrag.pointerId); }catch(_){}
     showDetail(pendingDrag.id);
@@ -1751,6 +1783,10 @@ overlay.addEventListener("pointerup",async e=>{
   }
   e.preventDefault();
 });
+
+// タッチがブラウザに奪われた場合も長押し待機をクリア
+overlay.addEventListener("pointercancel",()=>{ cancelPendingNewForm(); });
+overlay.addEventListener("pointerleave",()=>{ cancelPendingNewForm(); });
 
 // 搬入口＋時間が重複している予約IDの集合を返す
 let conflictIds=new Set();
