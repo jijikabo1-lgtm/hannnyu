@@ -458,6 +458,19 @@
     }
     .floor-detail-item:hover{border-color:#a5b4fc;box-shadow:0 4px 12px rgba(79,70,229,.08)}
     .floor-detail-empty{padding:30px 16px;text-align:center;color:var(--muted);font-size:13px}
+    /* フロアごとのグループ表示 */
+    .floor-group{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed #cbd5e1}
+    .floor-group:last-child{border-bottom:none}
+    .floor-group-name{
+      flex:0 0 64px;font-size:15px;font-weight:800;color:#3730a3;
+      letter-spacing:.02em;padding-top:6px;
+      position:sticky;top:0;align-self:flex-start;
+    }
+    .floor-group-items{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+    @media(max-width:520px){
+      .floor-group{flex-direction:column;gap:8px}
+      .floor-group-name{flex:none;padding-top:0;font-size:14px}
+    }
     @media(max-width:768px){
       .floor-section-wrap{flex-direction:column}
       .floor-section{flex:none;max-width:none;max-height:50vh}
@@ -2240,9 +2253,13 @@ function renderFloorDetail(){
     wrap.innerHTML='<div class="floor-detail-empty">この条件の予約はありません。</div>';
     return;
   }
-  wrap.innerHTML=list.map(r=>{
+  // 予約カードのHTMLを生成
+  const itemHtml=(r,withFloor)=>{
     const col=vColor(r.vendorName||"");
     const ec=resColor(r);
+    const floorLine = withFloor
+      ? `🏢 <strong style="color:#334155">${esc(r.floor||"-")}</strong> ／ <span style="color:${ec};font-weight:700">🚪 ${esc(r.entrance||"-")}</span><br>`
+      : `<span style="color:${ec};font-weight:700">🚪 ${esc(r.entrance||"-")}</span><br>`;
     return `<div class="floor-detail-item" onclick="openEditForm('${r.id}')">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
         <strong style="display:inline-flex;align-items:center;gap:6px;font-size:14px">
@@ -2252,11 +2269,37 @@ function renderFloorDetail(){
       </div>
       <div style="font-size:12px;color:var(--muted);line-height:1.7">
         📅 ${esc(r.deliveryDate||"-")} ${esc(r.timeStart||"")}${r.timeEnd?" 〜 "+esc(r.timeEnd):""}<br>
-        🏢 <strong style="color:#334155">${esc(r.floor||"-")}</strong> ／ <span style="color:${ec};font-weight:700">🚪 ${esc(r.entrance||"-")}</span><br>
+        ${floorLine}
         📦 ${esc(r.items||"-")}
       </div>
     </div>`;
-  }).join("");
+  };
+
+  if(!floorSelected){
+    // フロアごとにグループ表示（順序は断面図と同じ）
+    const order=effectiveFloors();
+    const groups=new Map();
+    list.forEach(r=>{
+      const k=r.floor||"(未設定)";
+      if(!groups.has(k)) groups.set(k,[]);
+      groups.get(k).push(r);
+    });
+    // 並び順：効力のあるフロア順 → 並びにないものを末尾
+    const sortedFloors=[
+      ...order.filter(f=>groups.has(f)),
+      ...[...groups.keys()].filter(f=>!order.includes(f))
+    ];
+    wrap.innerHTML=sortedFloors.map(f=>{
+      const items=groups.get(f).map(r=>itemHtml(r,false)).join("");
+      return `<div class="floor-group">
+        <div class="floor-group-name">${esc(f)}</div>
+        <div class="floor-group-items">${items}</div>
+      </div>`;
+    }).join("");
+  } else {
+    // 特定フロアのみ：通常リスト
+    wrap.innerHTML=list.map(r=>itemHtml(r,false)).join("");
+  }
 }
 // 日付初期化
 (function initFloorDate(){
